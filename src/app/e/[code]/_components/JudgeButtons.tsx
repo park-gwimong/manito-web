@@ -31,7 +31,7 @@ export function JudgeButtons({
 
   return (
     <div className="flex flex-col gap-2 rounded-field bg-sun-tint px-4 py-3">
-      <p className="text-sm font-semibold text-ink">이 기록은 내 마니또가 쓴 글인가요?</p>
+      <p className="text-sm font-semibold text-ink">이 기록, 내가 몰래 한 일이 맞나요?</p>
       <div className="flex gap-2">
         {options.map((o) => (
           <button
