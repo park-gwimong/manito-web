@@ -7,7 +7,12 @@ import { createEvent } from "./events";
 import { DomainError } from "./errors";
 import {
   acknowledgePinReset,
+  getMember,
+  getPinResetTrace,
+  getSessionMember,
+  isSessionCurrent,
   joinEvent,
+  listLoginCandidates,
   loginWithPin,
   removeParticipant,
   resetOrganizerPin,
@@ -101,12 +106,63 @@ test("PIN 5번 틀리면 6번째는 맞아도 PIN_LOCKED, 5분 뒤에는 통과"
   expect(ok.pinLockedUntil).toBeNull();
 });
 
-test("동시에 틀린 PIN을 보내도 횟수가 누락되지 않고 잠긴다", async () => {
+test("동시에 틀린 PIN을 보내도 횟수가 누락되지 않고, 가장 긴 잠금이 남는다", async () => {
   const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
   await Promise.all(Array.from({ length: 6 }, () => codeOf(() => loginWithPin(db, p.id, "9999", now))));
   const after = await get(p.id);
   expect(after.failedPinAttempts).toBe(6);
-  expect(after.pinLockedUntil?.getTime()).toBe(minutes(5).getTime());
+  expect(after.pinLockedUntil?.getTime()).toBe(minutes(10).getTime());
+});
+
+async function messageOf(fn: () => unknown) {
+  try {
+    await fn();
+  } catch (e) {
+    return e instanceof DomainError ? e.message : String(e);
+  }
+  return null;
+}
+
+test("잠금이 풀린 뒤 또 틀리면 잠금 시간이 두 배로 늘어난다(5분 → 10분 → 20분)", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  for (let i = 0; i < 4; i++) await codeOf(() => loginWithPin(db, p.id, "9999", now));
+  expect(await messageOf(() => loginWithPin(db, p.id, "9999", now))).toBe("PIN이 맞지 않아요. 5분 동안 잠겼어요.");
+  expect((await get(p.id)).pinLockedUntil?.getTime()).toBe(minutes(5).getTime());
+
+  expect(await messageOf(() => loginWithPin(db, p.id, "9999", minutes(5)))).toBe(
+    "PIN이 맞지 않아요. 10분 동안 잠겼어요.",
+  );
+  expect((await get(p.id)).pinLockedUntil?.getTime()).toBe(minutes(15).getTime());
+  expect(await messageOf(() => loginWithPin(db, p.id, "1234", minutes(7)))).toBe(
+    "PIN을 여러 번 틀려 잠겼어요. 8분 뒤에 다시 시도해 주세요.",
+  );
+
+  expect(await codeOf(() => loginWithPin(db, p.id, "9999", minutes(15)))).toBe("WRONG_PIN");
+  expect((await get(p.id)).pinLockedUntil?.getTime()).toBe(minutes(35).getTime());
+});
+
+test("잠금 시간은 24시간을 넘지 않고, 남은 시간은 시간 단위로 알려 준다", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  // 13번 틀린 상태에서 14번째로 틀리면 5분 × 2^9 = 2560분이지만 24시간에 묶인다.
+  await db.update(participants).set({ failedPinAttempts: 13 }).where(eq(participants.id, p.id));
+  expect(await messageOf(() => loginWithPin(db, p.id, "9999", now))).toBe(
+    "PIN이 맞지 않아요. 24시간 동안 잠겼어요.",
+  );
+  expect((await get(p.id)).pinLockedUntil?.getTime()).toBe(minutes(1440).getTime());
+  expect(await messageOf(() => loginWithPin(db, p.id, "1234", minutes(60)))).toBe(
+    "PIN을 여러 번 틀려 잠겼어요. 23시간 뒤에 다시 시도해 주세요.",
+  );
+  expect(await messageOf(() => loginWithPin(db, p.id, "1234", minutes(1440 - 90)))).toBe(
+    "PIN을 여러 번 틀려 잠겼어요. 1시간 30분 뒤에 다시 시도해 주세요.",
+  );
+
+  await db.update(participants).set({ failedPinAttempts: 40, pinLockedUntil: null }).where(eq(participants.id, p.id));
+  await codeOf(() => loginWithPin(db, p.id, "9999", now));
+  expect((await get(p.id)).pinLockedUntil?.getTime()).toBe(minutes(1440).getTime());
+
+  const ok = await loginWithPin(db, p.id, "1234", minutes(1440));
+  expect(ok.failedPinAttempts).toBe(0);
+  expect(ok.pinLockedUntil).toBeNull();
 });
 
 test("setNewPin은 동시에 호출해도 한 번만 성공한다", async () => {
@@ -143,6 +199,75 @@ test("초기화하면 pinResetAt이 찍히고 기존 PIN으로 로그인 불가(
 
   await acknowledgePinReset(db, p.id);
   expect((await get(p.id)).pinResetAt).toBeNull();
+});
+
+test("lastPinResetAt은 초기화 때 찍히고, 확인·새 PIN 설정·로그인으로도 지워지지 않는다", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  expect((await get(p.id)).lastPinResetAt).toBeNull();
+  expect(await getPinResetTrace(db, p.id)).toBeNull();
+
+  await resetPin(db, organizer.id, p.id, minutes(10));
+  expect((await get(p.id)).lastPinResetAt?.getTime()).toBe(minutes(10).getTime());
+  await setNewPin(db, p.id, "5678", minutes(11));
+  await loginWithPin(db, p.id, "5678", minutes(12));
+  await acknowledgePinReset(db, p.id);
+  const after = await get(p.id);
+  expect(after.pinResetAt).toBeNull();
+  expect(after.lastPinResetAt?.getTime()).toBe(minutes(10).getTime());
+  expect(await getPinResetTrace(db, p.id)).toEqual({ resetAt: minutes(10) });
+
+  await resetPin(db, organizer.id, p.id, minutes(20));
+  expect(await getPinResetTrace(db, p.id)).toEqual({ resetAt: minutes(20) });
+});
+
+test("관리 비밀번호로 개설자 PIN을 초기화해도 lastPinResetAt이 찍힌다", async () => {
+  process.env.ADMIN_PASSWORD = "secret-admin";
+  await resetOrganizerPin(db, event.id, "secret-admin", minutes(3));
+  expect((await get(organizer.id)).lastPinResetAt?.getTime()).toBe(minutes(3).getTime());
+});
+
+test("isSessionCurrent: 마지막 초기화 시각 이전(또는 같은 시각)에 발급된 세션은 무효", () => {
+  expect(isSessionCurrent({ lastPinResetAt: null }, minutes(0))).toBe(true);
+  expect(isSessionCurrent({ lastPinResetAt: minutes(10) }, minutes(9))).toBe(false);
+  expect(isSessionCurrent({ lastPinResetAt: minutes(10) }, minutes(10))).toBe(false);
+  expect(isSessionCurrent({ lastPinResetAt: minutes(10) }, minutes(11))).toBe(true);
+});
+
+test("getSessionMember: 초기화 전에 발급된 세션은 null, 초기화 뒤 발급된 세션은 참가자", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  expect((await getSessionMember(db, event.id, p.id, minutes(1)))?.id).toBe(p.id);
+  await resetPin(db, organizer.id, p.id, minutes(10));
+  expect(await getSessionMember(db, event.id, p.id, minutes(1))).toBeNull();
+  expect(await getSessionMember(db, event.id, p.id, minutes(10))).toBeNull();
+  expect((await getSessionMember(db, event.id, p.id, minutes(11)))?.id).toBe(p.id);
+});
+
+test("getMember·getSessionMember는 다른 이벤트의 참가자를 돌려주지 않는다", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  const other = await createEvent(
+    db,
+    {
+      name: "다른 모임",
+      startsAt: new Date("2026-11-25T00:00:00Z"),
+      endsAt: new Date("2026-11-30T00:00:00Z"),
+      missionCount: 3,
+      organizerName: "개설자",
+      organizerPin: "0000",
+    },
+    now,
+  );
+  expect((await getMember(db, event.id, p.id))?.id).toBe(p.id);
+  expect(await getMember(db, other.event.id, p.id)).toBeNull();
+  expect(await getSessionMember(db, other.event.id, p.id, minutes(1))).toBeNull();
+});
+
+test("listLoginCandidates는 이름 선택에 필요한 id·name·needsNewPin만 돌려준다", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  await resetPin(db, organizer.id, p.id, minutes(1));
+  expect(await listLoginCandidates(db, event.id)).toEqual([
+    { id: organizer.id, name: "개설자", needsNewPin: false },
+    { id: p.id, name: "지민", needsNewPin: true },
+  ]);
 });
 
 test("초기화는 잠금도 풀어 준다", async () => {

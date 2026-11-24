@@ -1,0 +1,1 @@
+ALTER TABLE "participants" ADD COLUMN "last_pin_reset_at" timestamp with time zone;

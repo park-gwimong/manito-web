@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import {
   assignments,
@@ -63,6 +63,16 @@ export async function setGuess(db: Db, participantId: string, guessedId: string,
 export async function getMyGuess(db: Db, participantId: string): Promise<string | null> {
   const [row] = await db.select().from(guesses).where(eq(guesses.participantId, participantId));
   return row?.guessedId ?? null;
+}
+
+/** 아직 마니또를 추측하지 않은 참가자 수. 누구인지는 내보내지 않는다. */
+export async function countUnguessed(db: Db, eventId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(participants)
+    .leftJoin(guesses, eq(guesses.participantId, participants.id))
+    .where(and(eq(participants.eventId, eventId), isNull(guesses.participantId)));
+  return row?.n ?? 0;
 }
 
 async function requireOrganizer(db: Db, organizerId: string, now: Date) {

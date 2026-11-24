@@ -36,6 +36,8 @@ export const participants = pgTable(
     pinHash: text("pin_hash"),
     isOrganizer: boolean("is_organizer").notNull().default(false),
     pinResetAt: tz("pin_reset_at"),
+    /** 마지막으로 PIN이 초기화된 시각. 지우지 않는다(이 시각 이전에 발급된 세션은 무효). */
+    lastPinResetAt: tz("last_pin_reset_at"),
     failedPinAttempts: integer("failed_pin_attempts").notNull().default(0),
     pinLockedUntil: tz("pin_locked_until"),
     createdAt: tz("created_at").notNull().defaultNow(),

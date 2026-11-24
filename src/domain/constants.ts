@@ -13,4 +13,7 @@ export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "🥹"] as con
 export const BODY_MAX = 500;
 export const NAME_MAX = 20;
 export const PIN_MAX_FAILS = 5;
+/** 첫 잠금(PIN_MAX_FAILS번째 실패) 시간. 그 뒤로 실패할 때마다 두 배가 된다. */
 export const PIN_LOCK_MINUTES = 5;
+/** 잠금 시간 상한(24시간). */
+export const PIN_LOCK_MAX_MINUTES = 1440;

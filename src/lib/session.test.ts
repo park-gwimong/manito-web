@@ -12,9 +12,14 @@ afterEach(() => {
 
 const payload = { participantId: "p-1", eventId: "e-1" };
 
-test("토큰을 만들고 다시 읽는다", async () => {
+test("토큰을 만들고 다시 읽으면 발급 시각(초 단위)도 함께 돌려준다", async () => {
+  const before = Math.floor(Date.now() / 1000) * 1000;
   const token = await createSessionToken(payload);
-  expect(await readSessionToken(token)).toEqual(payload);
+  const after = Date.now();
+  const read = await readSessionToken(token);
+  expect(read).toEqual({ ...payload, issuedAt: expect.any(Date) });
+  expect(read!.issuedAt.getTime()).toBeGreaterThanOrEqual(before);
+  expect(read!.issuedAt.getTime()).toBeLessThanOrEqual(after);
 });
 
 test("한 글자 바꾼 토큰은 null", async () => {

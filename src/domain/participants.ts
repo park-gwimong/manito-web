@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { events, participants, type Participant } from "@/db/schema";
-import { NAME_MAX, PIN_LOCK_MINUTES, PIN_MAX_FAILS } from "./constants";
+import { NAME_MAX, PIN_LOCK_MAX_MINUTES, PIN_LOCK_MINUTES, PIN_MAX_FAILS } from "./constants";
 import { DomainError } from "./errors";
 
 const BCRYPT_COST = process.env.NODE_ENV === "test" ? 4 : 10;
@@ -74,6 +74,20 @@ export async function joinEvent(
   });
 }
 
+/** 실패 횟수에 따른 잠금 시간(분). PIN_MAX_FAILS번째 실패부터 5분, 10분, 20분…, 상한 24시간. */
+export function pinLockMinutes(failedAttempts: number): number {
+  if (failedAttempts < PIN_MAX_FAILS) return 0;
+  return Math.min(PIN_LOCK_MAX_MINUTES, PIN_LOCK_MINUTES * 2 ** (failedAttempts - PIN_MAX_FAILS));
+}
+
+/** "8분", "23시간", "1시간 30분" */
+function formatDuration(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (hours === 0) return `${mins}분`;
+  return mins === 0 ? `${hours}시간` : `${hours}시간 ${mins}분`;
+}
+
 export async function loginWithPin(
   db: Db,
   participantId: string,
@@ -82,7 +96,11 @@ export async function loginWithPin(
 ): Promise<Participant> {
   const p = await getParticipant(db, participantId);
   if (p.pinLockedUntil && p.pinLockedUntil.getTime() > now.getTime()) {
-    throw new DomainError("PIN_LOCKED", "PIN을 여러 번 틀려 잠시 잠겼어요. 5분 뒤에 다시 시도해 주세요.");
+    const remaining = Math.ceil((p.pinLockedUntil.getTime() - now.getTime()) / 60_000);
+    throw new DomainError(
+      "PIN_LOCKED",
+      `PIN을 여러 번 틀려 잠겼어요. ${formatDuration(remaining)} 뒤에 다시 시도해 주세요.`,
+    );
   }
   if (!p.pinHash) {
     throw new DomainError("PIN_RESET_REQUIRED", "PIN이 초기화되었어요. 새 PIN을 설정해 주세요.");
@@ -94,17 +112,24 @@ export async function loginWithPin(
       .set({ failedPinAttempts: sql`${participants.failedPinAttempts} + 1` })
       .where(eq(participants.id, participantId))
       .returning({ attempts: participants.failedPinAttempts });
-    const lock = counted.attempts >= PIN_MAX_FAILS;
-    if (lock) {
+    const lockMinutes = pinLockMinutes(counted.attempts);
+    if (lockMinutes > 0) {
+      const until = new Date(now.getTime() + lockMinutes * 60_000);
+      // 동시에 들어온 요청끼리 더 짧은 잠금으로 덮어쓰지 않게 한다.
       await db
         .update(participants)
-        .set({ pinLockedUntil: new Date(now.getTime() + PIN_LOCK_MINUTES * 60_000) })
-        .where(eq(participants.id, participantId));
+        .set({ pinLockedUntil: until })
+        .where(
+          and(
+            eq(participants.id, participantId),
+            or(isNull(participants.pinLockedUntil), lt(participants.pinLockedUntil, until)),
+          ),
+        );
     }
     throw new DomainError(
       "WRONG_PIN",
-      lock
-        ? `PIN이 맞지 않아요. ${PIN_LOCK_MINUTES}분 동안 잠겼어요.`
+      lockMinutes > 0
+        ? `PIN이 맞지 않아요. ${formatDuration(lockMinutes)} 동안 잠겼어요.`
         : "PIN이 맞지 않아요. 다시 확인해 주세요.",
     );
   }
@@ -139,7 +164,7 @@ export async function setNewPin(
 async function clearPin(db: Db, targetId: string, now: Date): Promise<void> {
   await db
     .update(participants)
-    .set({ pinHash: null, pinResetAt: now, failedPinAttempts: 0, pinLockedUntil: null })
+    .set({ pinHash: null, pinResetAt: now, lastPinResetAt: now, failedPinAttempts: 0, pinLockedUntil: null })
     .where(eq(participants.id, targetId));
 }
 
@@ -169,8 +194,58 @@ export async function resetOrganizerPin(
   await clearPin(db, organizer.id, now);
 }
 
+/** 알림 배너만 닫는다. lastPinResetAt(세션 무효화·영구 표시)은 그대로 둔다. */
 export async function acknowledgePinReset(db: Db, participantId: string): Promise<void> {
   await db.update(participants).set({ pinResetAt: null }).where(eq(participants.id, participantId));
+}
+
+/** 이 이벤트 소속 참가자. 다른 이벤트의 참가자 id면 null. */
+export async function getMember(db: Db, eventId: string, participantId: string): Promise<Participant | null> {
+  const [p] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.id, participantId), eq(participants.eventId, eventId)));
+  return p ?? null;
+}
+
+/**
+ * 세션이 아직 유효한지. PIN이 초기화된 적이 있으면 그 시각 이전(같은 시각 포함)에 발급된 세션은 모두 무효다.
+ * 그래서 초기화 뒤 다른 사람이 새 PIN으로 들어와도, 원래 주인은 로그인 화면으로 돌아가 초기화를 알게 된다.
+ */
+export function isSessionCurrent(member: Pick<Participant, "lastPinResetAt">, issuedAt: Date): boolean {
+  return member.lastPinResetAt === null || issuedAt.getTime() > member.lastPinResetAt.getTime();
+}
+
+/** 세션(참가자 id + 발급 시각)이 가리키는 이 이벤트의 참가자. 내보내졌거나 세션이 무효면 null. */
+export async function getSessionMember(
+  db: Db,
+  eventId: string,
+  participantId: string,
+  issuedAt: Date,
+): Promise<Participant | null> {
+  const member = await getMember(db, eventId, participantId);
+  return member && isSessionCurrent(member, issuedAt) ? member : null;
+}
+
+/** 로그인 화면의 "이름 선택"에 내보내는 최소 정보. PIN 해시·잠금 정보는 담지 않는다. */
+export type LoginCandidate = { id: string; name: string; needsNewPin: boolean };
+
+export async function listLoginCandidates(db: Db, eventId: string): Promise<LoginCandidate[]> {
+  const rows = await db
+    .select({ id: participants.id, name: participants.name, pinHash: participants.pinHash })
+    .from(participants)
+    .where(eq(participants.eventId, eventId))
+    .orderBy(participants.createdAt, participants.id);
+  return rows.map((r) => ({ id: r.id, name: r.name, needsNewPin: r.pinHash === null }));
+}
+
+/** 본인 홈에 늘 보이는 "개설자가 PIN을 초기화한 적 있음" 표시. 초기화된 적 없으면 null. */
+export async function getPinResetTrace(db: Db, participantId: string): Promise<{ resetAt: Date } | null> {
+  const [row] = await db
+    .select({ lastPinResetAt: participants.lastPinResetAt })
+    .from(participants)
+    .where(eq(participants.id, participantId));
+  return row?.lastPinResetAt ? { resetAt: row.lastPinResetAt } : null;
 }
 
 export async function removeParticipant(db: Db, organizerId: string, targetId: string): Promise<void> {

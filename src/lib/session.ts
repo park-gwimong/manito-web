@@ -1,6 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 
 export type SessionPayload = { participantId: string; eventId: string };
+/** 읽은 세션. `issuedAt`은 토큰의 iat(초 단위)이다. */
+export type ReadSession = SessionPayload & { issuedAt: Date };
 
 const SESSION_DAYS = 90;
 
@@ -18,13 +20,13 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
     .sign(secretKey());
 }
 
-/** 변조되었거나 만료된 토큰은 null. */
-export async function readSessionToken(token: string): Promise<SessionPayload | null> {
+/** 변조되었거나 만료되었거나 발급 시각이 없는 토큰은 null. */
+export async function readSessionToken(token: string): Promise<ReadSession | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-    const { participantId, eventId } = payload;
-    if (typeof participantId !== "string" || typeof eventId !== "string") return null;
-    return { participantId, eventId };
+    const { participantId, eventId, iat } = payload;
+    if (typeof participantId !== "string" || typeof eventId !== "string" || typeof iat !== "number") return null;
+    return { participantId, eventId, issuedAt: new Date(iat * 1000) };
   } catch {
     return null;
   }

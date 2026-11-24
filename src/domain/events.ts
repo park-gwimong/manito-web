@@ -88,27 +88,31 @@ export async function updateEventSettings(
   if (!organizer || !organizer.isOrganizer) {
     throw new DomainError("NOT_ORGANIZER", "개설자만 할 수 있어요.");
   }
-  const [event] = await db.select().from(events).where(eq(events.id, organizer.eventId));
-  if (event.status !== "preparing") {
-    throw new DomainError("NOT_PREPARING", "이벤트가 시작된 뒤에는 설정을 바꿀 수 없어요.");
-  }
-  const name = input.name.trim();
-  if (!name) throw new DomainError("INVALID_EVENT_NAME", "이벤트 이름을 입력해 주세요.");
-  const templates = await db
-    .select({ id: missionTemplates.id })
-    .from(missionTemplates)
-    .where(eq(missionTemplates.eventId, event.id));
-  validateSchedule(input, templates.length, now);
-  const [updated] = await db
-    .update(events)
-    .set({
-      name,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
-      missionCount: input.missionCount,
-      startMissedAt: null,
-    })
-    .where(eq(events.id, event.id))
-    .returning();
-  return updated;
+  // 이벤트 행을 FOR UPDATE로 잠근 채 상태를 다시 확인해, 시작 처리와 설정 변경이 겹치지 않게 한다.
+  return db.transaction(async (tx) => {
+    const [event] = await tx.select().from(events).where(eq(events.id, organizer.eventId)).for("update");
+    if (!event) throw new DomainError("EVENT_NOT_FOUND", "이벤트를 찾을 수 없어요.");
+    if (event.status !== "preparing") {
+      throw new DomainError("NOT_PREPARING", "이벤트가 시작된 뒤에는 설정을 바꿀 수 없어요.");
+    }
+    const name = input.name.trim();
+    if (!name) throw new DomainError("INVALID_EVENT_NAME", "이벤트 이름을 입력해 주세요.");
+    const templates = await tx
+      .select({ id: missionTemplates.id })
+      .from(missionTemplates)
+      .where(eq(missionTemplates.eventId, event.id));
+    validateSchedule(input, templates.length, now);
+    const [updated] = await tx
+      .update(events)
+      .set({
+        name,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        missionCount: input.missionCount,
+        startMissedAt: null,
+      })
+      .where(eq(events.id, event.id))
+      .returning();
+    return updated;
+  });
 }

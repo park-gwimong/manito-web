@@ -8,7 +8,14 @@ import { joinEvent } from "./participants";
 import { advanceEvent, getGiverIdOf } from "./lifecycle";
 import { addSecretDeed, createRecord, setVerdict } from "./records";
 import { completeMission } from "./missions";
-import { finishPresentation, getMyGuess, getRevealData, setGuess, startPresentation } from "./reveal";
+import {
+  countUnguessed,
+  finishPresentation,
+  getMyGuess,
+  getRevealData,
+  setGuess,
+  startPresentation,
+} from "./reveal";
 
 const now = new Date("2026-11-24T00:00:00Z");
 const days = (d: number) => new Date(now.getTime() + d * 86_400_000);
@@ -224,4 +231,17 @@ test("awards: 동점이면 둘 다, 아무도 해당 없으면 빈 배열", asyn
   expect(awards.heotdari).toEqual([]);
   expect(awards.shadow).toEqual([members[2].name]);
   expect(awards.mission).toEqual([members[3].name]);
+});
+
+test("countUnguessed는 이 이벤트에서 아직 추측하지 않은 사람 수만 센다", async () => {
+  const other = await setup();
+  await setGuess(db, other.members[0].id, other.members[1].id, closedAt);
+
+  const { event, members } = await setup();
+  expect(await countUnguessed(db, event.id)).toBe(4);
+  await setGuess(db, members[0].id, members[1].id, closedAt);
+  await setGuess(db, members[0].id, members[2].id, closedAt);
+  expect(await countUnguessed(db, event.id)).toBe(3);
+  for (const m of members.slice(1)) await setGuess(db, m.id, members[0].id, closedAt);
+  expect(await countUnguessed(db, event.id)).toBe(0);
 });
