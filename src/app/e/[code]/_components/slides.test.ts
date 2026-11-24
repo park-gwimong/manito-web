@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { RevealData } from "@/domain/reveal";
-import { buildSlides } from "./slides";
+import { AWARD_META, buildSlides } from "./slides";
 
 const zeroScore = { live: 0, hit: 0, recognized: 0, verdict: 0, secretDeed: 0, guess: 0 };
 
@@ -55,4 +55,8 @@ describe("buildSlides", () => {
     const podium = buildSlides(fixture([50, 40, 30, 20])).find((s) => s.kind === "podium");
     expect(podium?.kind === "podium" && podium.top.map((t) => t.total)).toEqual([50, 40, 30]);
   });
+});
+
+test("시상 부문 이름은 스펙의 '그림자 마니또'를 쓴다", () => {
+  expect(AWARD_META.find((a) => a.key === "shadow")?.title).toBe("그림자 마니또");
 });

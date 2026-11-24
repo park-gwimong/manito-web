@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, Screen } from "../../../_components/ui";
+import { PinResetTrace } from "./PinResetTrace";
 
 type Props = {
   code: string;
@@ -13,6 +14,8 @@ type Props = {
   isOrganizer: boolean;
   startMissed: boolean;
   minParticipants: number;
+  /** 개설자가 내 PIN을 초기화한 적 있으면 그 시각(KST 표기), 없으면 null. */
+  pinResetAtLabel: string | null;
 };
 
 export function Lobby(props: Props) {
@@ -25,6 +28,8 @@ export function Lobby(props: Props) {
         <p className="text-sm text-ink-soft">{props.startsAtLabel}에 시작해요</p>
         <h1 className="font-display text-4xl leading-tight text-ink">{props.eventName}</h1>
       </header>
+
+      {props.pinResetAtLabel && <PinResetTrace resetAtLabel={props.pinResetAtLabel} />}
 
       {props.startMissed ? (
         <p role="status" className="rounded-field bg-danger-tint px-4 py-3 text-sm leading-relaxed text-danger">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
+import { getPinResetTrace } from "@/domain/participants";
 import { getMyGuess } from "@/domain/reveal";
 import { getFeed, getHeader, getLobby } from "@/domain/views";
 import { formatKst } from "@/lib/format";
@@ -13,7 +14,14 @@ import { Header } from "./_components/Header";
 import { JoinForm } from "./_components/JoinForm";
 import { Lobby } from "./_components/Lobby";
 import { LoginForm } from "./_components/LoginForm";
+import { PinResetTrace } from "./_components/PinResetTrace";
 import { RecordForm } from "./_components/RecordForm";
+
+const STATUS_LABEL = {
+  active: "진행 중인 마니또",
+  closed: "끝난 마니또 · 발표를 기다리고 있어요",
+  revealed: "끝난 마니또 · 결과가 공개됐어요",
+} as const;
 
 export default async function EventPage({ params }: PageProps<"/e/[code]">) {
   const viewer = await getViewer((await params).code);
@@ -27,7 +35,7 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
       <Screen>
         <header className="flex flex-col gap-2">
           <p className="text-sm text-ink-soft">
-            {preparing ? `${formatKst(event.startsAt)}에 시작해요` : "진행 중인 마니또"}
+            {event.status === "preparing" ? `${formatKst(event.startsAt)}에 시작해요` : STATUS_LABEL[event.status]}
           </p>
           <h1 className="font-display text-4xl leading-tight text-ink">{event.name}</h1>
         </header>
@@ -55,8 +63,9 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
     );
   }
 
+  const db = getDb();
   if (event.status === "preparing") {
-    const lobby = await getLobby(getDb(), event.id);
+    const [lobby, trace] = await Promise.all([getLobby(db, event.id), getPinResetTrace(db, me.id)]);
     return (
       <Lobby
         code={event.code}
@@ -67,23 +76,27 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
         isOrganizer={me.isOrganizer}
         startMissed={lobby.startMissed}
         minParticipants={lobby.minParticipants}
+        pinResetAtLabel={trace ? formatKst(trace.resetAt) : null}
       />
     );
   }
 
-  const db = getDb();
   const active = event.status === "active";
   const closed = event.status === "closed";
-  const [header, feed, lobby, myGuessId] = await Promise.all([
+  const [header, feed, lobby, myGuessId, trace] = await Promise.all([
     getHeader(db, event, new Date()),
     getFeed(db, event.id, me.id),
     closed ? getLobby(db, event.id) : null,
     closed ? getMyGuess(db, me.id) : null,
+    getPinResetTrace(db, me.id),
   ]);
   return (
     <Screen>
       {active && <AutoRefresh />}
+      {/* 마감 뒤에도 "발표 시작 → 추측 잠김"과 결과 공개를 새로고침 없이 받는다. */}
+      {closed && <AutoRefresh intervalMs={30_000} />}
       <Header eventName={event.name} temperature={header.temperature} dday={header.dday} />
+      {trace && <PinResetTrace resetAtLabel={formatKst(trace.resetAt)} />}
       {active && <RecordForm code={event.code} />}
       {closed && (
         <>

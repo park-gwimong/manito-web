@@ -48,11 +48,10 @@ export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
                 </strong>
               </p>
             )}
-            <div className="flex flex-col gap-1.5">
-              <p className="text-sm font-semibold">{c.receiver.name}의 기록</p>
-              {c.records.length === 0 ? (
-                <p className="text-sm text-ink-soft">남긴 기록이 없어요.</p>
-              ) : (
+            {/* 비어 있는 부분은 아예 그리지 않는다. 아무것도 안 한 사람을 드러내지 않기 위해서다. */}
+            {c.records.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-semibold">{c.receiver.name}의 기록</p>
                 <ul className="flex flex-col gap-1.5">
                   {c.records.map((r, i) => (
                     <li key={i} className="flex gap-2 rounded-field bg-paper px-3 py-2 text-sm">
@@ -71,13 +70,11 @@ export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
                     </li>
                   ))}
                 </ul>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <p className="text-sm font-semibold">{c.giver.name}이(가) 몰래 한 일</p>
-              {c.unnoticedDeeds.length === 0 ? (
-                <p className="text-sm text-ink-soft">남긴 몰래 한 일이 없어요.</p>
-              ) : (
+              </div>
+            )}
+            {c.unnoticedDeeds.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-semibold">{c.giver.name}이(가) 몰래 한 일</p>
                 <ul className="flex flex-col gap-1.5">
                   {c.unnoticedDeeds.map((d, i) => (
                     <li key={i} className="rounded-field border-2 border-dashed border-line px-3 py-2 text-sm leading-relaxed">
@@ -85,8 +82,8 @@ export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
                     </li>
                   ))}
                 </ul>
-              )}
-            </div>
+              </div>
+            )}
           </Card>
         ))}
       </section>

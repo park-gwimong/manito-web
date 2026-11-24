@@ -167,27 +167,33 @@ function SlideBody({ slide, code }: { slide: Slide; code: string }) {
         </>
       );
     }
-    case "podium":
+    case "podium": {
+      // 1등 숫자 대신, 가장 높은 점수와 같은 사람을 모두 똑같이 강조한다.
+      const best = slide.top[0]?.total;
       return (
         <>
           <p className={`${BIG} mb-[4vh]`}>가장 빛난 사람들</p>
           <ul className="flex flex-wrap items-end justify-center gap-4">
-            {slide.top.map((t, i) => (
-              <li
-                key={t.name}
-                className={`flex flex-col items-center gap-2 rounded-card px-8 py-6 ${
-                  i === 0 ? "bg-sun text-ink" : "bg-berry-deep/80"
-                }`}
-              >
-                <span className="font-display text-[clamp(2rem,5vw,4.5rem)]">{t.name}</span>
-                <span className={`font-display text-[clamp(1.25rem,3vw,2.5rem)] ${i === 0 ? "text-berry-deep" : "text-sun"}`}>
-                  {t.total}점
-                </span>
-              </li>
-            ))}
+            {slide.top.map((t) => {
+              const top = t.total === best;
+              return (
+                <li
+                  key={t.name}
+                  className={`flex flex-col items-center gap-2 rounded-card px-8 py-6 ${
+                    top ? "bg-sun text-ink" : "bg-berry-deep/80"
+                  }`}
+                >
+                  <span className="font-display text-[clamp(2rem,5vw,4.5rem)]">{t.name}</span>
+                  <span className={`font-display text-[clamp(1.25rem,3vw,2.5rem)] ${top ? "text-berry-deep" : "text-sun"}`}>
+                    {t.total}점
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </>
       );
+    }
     case "end":
       return <EndSlide code={code} />;
   }

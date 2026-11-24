@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useState } from "react";
 import { Button, ErrorText, Field, PinField } from "../../../_components/ui";
 import type { ActionResult } from "@/lib/action";
@@ -7,6 +8,7 @@ import type { LoginCandidate } from "@/lib/viewer";
 import { loginAction, resetOrganizerPinAction, setNewPinAction } from "../actions";
 
 export function LoginForm({ code, candidates }: { code: string; candidates: LoginCandidate[] }) {
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = candidates.find((c) => c.id === selectedId) ?? null;
 
@@ -15,11 +17,19 @@ export function LoginForm({ code, candidates }: { code: string; candidates: Logi
       const target = candidates.find((c) => c.id === formData.get("participantId"));
       if (!target) return { ok: false, error: "이름을 골라 주세요." };
       const pin = String(formData.get("pin") ?? "");
-      if (!target.needsNewPin) return loginAction(code, target.id, pin);
+      if (!target.needsNewPin) {
+        const result = await loginAction(code, target.id, pin);
+        // 화면을 연 뒤에 PIN이 초기화됐을 수 있다(PIN_RESET_REQUIRED). 목록을 다시 받아 "새 PIN" 양식으로 바꾼다.
+        if (!result.ok) router.refresh();
+        return result;
+      }
       if (pin !== formData.get("pinConfirm")) {
         return { ok: false, error: "두 PIN이 서로 달라요. 다시 입력해 주세요." };
       }
-      return setNewPinAction(code, target.id, pin);
+      const result = await setNewPinAction(code, target.id, pin);
+      // 그 사이 다른 기기에서 새 PIN을 정했다면(PIN_NOT_RESET) 일반 로그인 양식으로 돌아가게 한다.
+      if (!result.ok) router.refresh();
+      return result;
     },
     null,
   );

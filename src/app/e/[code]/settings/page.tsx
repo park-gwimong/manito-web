@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { listTemplates } from "@/domain/missions";
+import { countUnguessed } from "@/domain/reveal";
 import { getLobby } from "@/domain/views";
 import { toKstInput } from "@/lib/format";
 import { getViewer } from "@/lib/viewer";
@@ -20,9 +21,10 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
   if (!me?.isOrganizer) redirect(`/e/${event.code}`);
 
   const db = getDb();
-  const [lobby, templates] = await Promise.all([
+  const [lobby, templates, unguessed] = await Promise.all([
     getLobby(db, event.id),
     event.status === "preparing" ? listTemplates(db, event.id) : Promise.resolve([]),
+    event.status === "closed" ? countUnguessed(db, event.id) : Promise.resolve(0),
   ]);
   const preparing = event.status === "preparing";
 
@@ -45,7 +47,11 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
       )}
 
       {event.status === "closed" && (
-        <PresentationStart code={event.code} started={event.presentationStartedAt !== null} />
+        <PresentationStart
+          code={event.code}
+          started={event.presentationStartedAt !== null}
+          unguessed={unguessed}
+        />
       )}
 
       {event.status === "revealed" && (

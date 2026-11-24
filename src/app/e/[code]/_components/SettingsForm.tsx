@@ -62,13 +62,23 @@ export function SettingsForm(props: Props) {
 }
 
 /** 마감 후 "결과 발표 시작". 시작하면 추측이 잠기므로 한 번 더 확인한다. */
-export function PresentationStart({ code, started }: { code: string; started: boolean }) {
+export function PresentationStart({
+  code,
+  started,
+  unguessed,
+}: {
+  code: string;
+  started: boolean;
+  /** 아직 추측하지 않은 사람 수(이름은 받지 않는다). */
+  unguessed: number;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function start() {
-    if (!started && !window.confirm("발표를 시작하면 더 이상 마니또를 추측할 수 없어요. 시작할까요?")) return;
+    const notice = unguessed > 0 ? `아직 ${unguessed}명이 추측하지 않았어요. ` : "";
+    if (!started && !window.confirm(`${notice}발표를 시작하면 더 이상 마니또를 추측할 수 없어요. 시작할까요?`)) return;
     setError(null);
     startTransition(async () => {
       const result: ActionResult = started ? { ok: true } : await startPresentationAction(code);
@@ -83,8 +93,18 @@ export function PresentationStart({ code, started }: { code: string; started: bo
       <p className="text-sm leading-relaxed text-ink-soft">
         {started
           ? "발표가 시작됐어요. 큰 화면에 이어서 띄워 주세요."
-          : "큰 화면(TV나 빔프로젝터)에 연결한 기기에서 시작해 주세요. 시작하면 추측이 잠겨요."}
+          : "큰 화면(TV나 빔프로젝터)에 연결한 기기에서 시작해 주세요."}
       </p>
+      {!started && (
+        <>
+          <p role="status" className="rounded-field bg-paper px-4 py-3 text-sm font-medium">
+            {unguessed > 0 ? `아직 추측하지 않은 사람: ${unguessed}명` : "모두 추측을 마쳤어요"}
+          </p>
+          <p className="rounded-field bg-danger-tint px-4 py-3 text-sm font-medium text-danger">
+            발표를 시작하면 추측이 잠기고, 다시 열 수 없어요.
+          </p>
+        </>
+      )}
       <ErrorText>{error}</ErrorText>
       <Button type="button" onClick={start} disabled={pending}>
         {pending ? "여는 중…" : started ? "발표 화면 열기" : "결과 발표 시작"}
