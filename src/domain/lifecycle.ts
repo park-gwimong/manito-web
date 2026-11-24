@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { assignments, events, participants, type Event, type Participant } from "@/db/schema";
 import { MIN_PARTICIPANTS } from "./constants";
 import { DomainError } from "./errors";
+import { deliverDueMissions } from "./missions";
 
 /** rng로 섞은 뒤 i번째가 (i+1)번째에게, 마지막이 첫 번째에게 주는 하나의 고리. */
 export function buildChain(
@@ -82,9 +83,13 @@ export async function advanceEvent(
     event = await loadEvent(db, eventId);
   }
 
-  if (event.status === "active" && now >= event.endsAt) {
-    await closeEvent(db, event);
-    event = await loadEvent(db, eventId);
+  if (event.status === "active") {
+    // 종료 뒤에 처음 불려도 모든 슬롯이 배달되도록, 마감 처리보다 먼저 배달한다.
+    await deliverDueMissions(db, event, now, rng);
+    if (now >= event.endsAt) {
+      await closeEvent(db, event);
+      event = await loadEvent(db, eventId);
+    }
   }
 
   return event;
