@@ -4,7 +4,7 @@ import type { Db } from "@/db/client";
 import { createTestDb } from "@/db/test-db";
 import { assignments, type Event, type Participant } from "@/db/schema";
 import { createEvent, updateEventSettings } from "./events";
-import { joinEvent } from "./participants";
+import { joinEvent, removeParticipant } from "./participants";
 import { advanceEvent, buildChain, getGiverIdOf, getTargetOf } from "./lifecycle";
 
 const now = new Date("2026-11-24T00:00:00Z");
@@ -158,4 +158,25 @@ test("getTargetOf / getGiverIdOf는 배정을 따라간다", async () => {
   expect(target).not.toBeNull();
   expect(target!.id).not.toBe(organizer.id);
   expect(await getGiverIdOf(db, target!.id)).toBe(organizer.id);
+});
+
+test("시작 뒤 입장은 NOT_PREPARING이고, 배정은 시작 시점 참가자만 정확히 포함한다", async () => {
+  const people = await join(3);
+  await advanceEvent(db, event.id, startsAt);
+  await expect(
+    joinEvent(db, event.id, { name: "늦은사람", pin: "1234" }, startsAt),
+  ).rejects.toMatchObject({ code: "NOT_PREPARING" });
+  const rows = await assignmentsOf(event.id);
+  const expected = [organizer.id, ...people.map((p) => p.id)].sort();
+  expect(rows.map((r) => r.giverId).sort()).toEqual(expected);
+  expect(rows.map((r) => r.receiverId).sort()).toEqual(expected);
+});
+
+test("시작 뒤 내보내기는 NOT_PREPARING이고 배정은 그대로", async () => {
+  const people = await join(3);
+  await advanceEvent(db, event.id, startsAt);
+  await expect(removeParticipant(db, organizer.id, people[0].id)).rejects.toMatchObject({
+    code: "NOT_PREPARING",
+  });
+  expect(await assignmentsOf(event.id)).toHaveLength(4);
 });

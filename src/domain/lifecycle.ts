@@ -29,6 +29,9 @@ async function loadEvent(db: Db, eventId: string): Promise<Event> {
 /** 준비 중 이벤트의 시작 처리: 4명 이상이면 배정 후 active, 미만이면 startMissedAt 기록. */
 async function startEvent(db: Db, event: Event, now: Date, rng: () => number): Promise<void> {
   await db.transaction(async (tx) => {
+    // 이벤트 행을 먼저 잠근다. 입장/내보내기는 FOR SHARE로 같은 행을 잠그므로 이후 명단이 바뀌지 않는다.
+    const [locked] = await tx.select().from(events).where(eq(events.id, event.id)).for("update");
+    if (!locked || locked.status !== "preparing" || locked.startMissedAt !== null) return;
     const members = await tx
       .select({ id: participants.id })
       .from(participants)

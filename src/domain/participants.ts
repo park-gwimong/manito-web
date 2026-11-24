@@ -56,21 +56,22 @@ export async function joinEvent(
   void now;
   const name = normalizeName(input.name);
   assertValidPin(input.pin);
-  const [event] = await db.select().from(events).where(eq(events.id, eventId));
-  if (!event) throw new DomainError("EVENT_NOT_FOUND", "이벤트를 찾을 수 없어요.");
-  if (event.status !== "preparing") {
-    throw new DomainError("NOT_PREPARING", "이미 시작된 이벤트에는 참가할 수 없어요.");
-  }
-  const [dup] = await db
-    .select({ id: participants.id })
-    .from(participants)
-    .where(and(eq(participants.eventId, eventId), eq(participants.name, name)));
-  if (dup) throw new DomainError("NAME_TAKEN", "이미 사용 중인 이름이에요. 다른 이름을 입력해 주세요.");
-  const [created] = await db
-    .insert(participants)
-    .values({ eventId, name, pinHash: await hashPin(input.pin) })
-    .returning();
-  return created;
+  const pinHash = await hashPin(input.pin);
+  // 이벤트 행을 FOR SHARE로 잠가 시작 처리(FOR UPDATE)와 직렬화한다.
+  return db.transaction(async (tx) => {
+    const [event] = await tx.select().from(events).where(eq(events.id, eventId)).for("share");
+    if (!event) throw new DomainError("EVENT_NOT_FOUND", "이벤트를 찾을 수 없어요.");
+    if (event.status !== "preparing") {
+      throw new DomainError("NOT_PREPARING", "이미 시작된 이벤트에는 참가할 수 없어요.");
+    }
+    const [dup] = await tx
+      .select({ id: participants.id })
+      .from(participants)
+      .where(and(eq(participants.eventId, eventId), eq(participants.name, name)));
+    if (dup) throw new DomainError("NAME_TAKEN", "이미 사용 중인 이름이에요. 다른 이름을 입력해 주세요.");
+    const [created] = await tx.insert(participants).values({ eventId, name, pinHash }).returning();
+    return created;
+  });
 }
 
 export async function loginWithPin(
@@ -174,10 +175,6 @@ export async function acknowledgePinReset(db: Db, participantId: string): Promis
 
 export async function removeParticipant(db: Db, organizerId: string, targetId: string): Promise<void> {
   const organizer = await requireOrganizer(db, organizerId);
-  const [event] = await db.select().from(events).where(eq(events.id, organizer.eventId));
-  if (event.status !== "preparing") {
-    throw new DomainError("NOT_PREPARING", "이벤트가 시작된 뒤에는 참가자를 내보낼 수 없어요.");
-  }
   if (targetId === organizerId) {
     throw new DomainError("CANNOT_REMOVE_ORGANIZER", "개설자는 내보낼 수 없어요.");
   }
@@ -185,5 +182,12 @@ export async function removeParticipant(db: Db, organizerId: string, targetId: s
   if (target.eventId !== organizer.eventId) {
     throw new DomainError("PARTICIPANT_NOT_FOUND", "참가자를 찾을 수 없어요.");
   }
-  await db.delete(participants).where(eq(participants.id, targetId));
+  // 이벤트 행을 잠근 채 상태를 다시 확인해, 시작 처리 도중 삭제가 끼어들지 못하게 한다.
+  await db.transaction(async (tx) => {
+    const [event] = await tx.select().from(events).where(eq(events.id, organizer.eventId)).for("share");
+    if (event.status !== "preparing") {
+      throw new DomainError("NOT_PREPARING", "이벤트가 시작된 뒤에는 참가자를 내보낼 수 없어요.");
+    }
+    await tx.delete(participants).where(eq(participants.id, targetId));
+  });
 }
