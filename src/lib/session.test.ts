@@ -19,8 +19,9 @@ test("토큰을 만들고 다시 읽는다", async () => {
 
 test("한 글자 바꾼 토큰은 null", async () => {
   const token = await createSessionToken(payload);
-  const last = token.slice(-1);
-  const tampered = token.slice(0, -1) + (last === "A" ? "B" : "A");
+  // 서명 중간의 글자를 바꾼다(마지막 글자는 유효 비트가 4개뿐이라 바꿔도 같은 값일 수 있다).
+  const i = token.length - 10;
+  const tampered = token.slice(0, i) + (token[i] === "A" ? "B" : "A") + token.slice(i + 1);
   expect(await readSessionToken(tampered)).toBeNull();
 });
 

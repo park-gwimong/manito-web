@@ -101,6 +101,25 @@ test("PIN 5번 틀리면 6번째는 맞아도 PIN_LOCKED, 5분 뒤에는 통과"
   expect(ok.pinLockedUntil).toBeNull();
 });
 
+test("동시에 틀린 PIN을 보내도 횟수가 누락되지 않고 잠긴다", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  await Promise.all(Array.from({ length: 6 }, () => codeOf(() => loginWithPin(db, p.id, "9999", now))));
+  const after = await get(p.id);
+  expect(after.failedPinAttempts).toBe(6);
+  expect(after.pinLockedUntil?.getTime()).toBe(minutes(5).getTime());
+});
+
+test("setNewPin은 동시에 호출해도 한 번만 성공한다", async () => {
+  const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
+  await resetPin(db, organizer.id, p.id, now);
+  const results = await Promise.all([
+    codeOf(() => setNewPin(db, p.id, "1111", now)),
+    codeOf(() => setNewPin(db, p.id, "2222", now)),
+  ]);
+  expect(results.filter((r) => r === null)).toHaveLength(1);
+  expect(results.filter((r) => r === "PIN_NOT_RESET")).toHaveLength(1);
+});
+
 test("성공하면 실패 횟수가 0으로 돌아간다", async () => {
   const p = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
   await codeOf(() => loginWithPin(db, p.id, "0000", now));

@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { events, participants, type Participant } from "@/db/schema";
 import { NAME_MAX, PIN_LOCK_MINUTES, PIN_MAX_FAILS } from "./constants";
@@ -87,15 +87,19 @@ export async function loginWithPin(
     throw new DomainError("PIN_RESET_REQUIRED", "PIN이 초기화되었어요. 새 PIN을 설정해 주세요.");
   }
   if (!(await bcrypt.compare(pin, p.pinHash))) {
-    const attempts = p.failedPinAttempts + 1;
-    const lock = attempts >= PIN_MAX_FAILS;
-    await db
+    // 동시 요청에도 횟수가 누락되지 않도록 SQL에서 원자적으로 증가시킨다.
+    const [counted] = await db
       .update(participants)
-      .set({
-        failedPinAttempts: attempts,
-        pinLockedUntil: lock ? new Date(now.getTime() + PIN_LOCK_MINUTES * 60_000) : p.pinLockedUntil,
-      })
-      .where(eq(participants.id, participantId));
+      .set({ failedPinAttempts: sql`${participants.failedPinAttempts} + 1` })
+      .where(eq(participants.id, participantId))
+      .returning({ attempts: participants.failedPinAttempts });
+    const lock = counted.attempts >= PIN_MAX_FAILS;
+    if (lock) {
+      await db
+        .update(participants)
+        .set({ pinLockedUntil: new Date(now.getTime() + PIN_LOCK_MINUTES * 60_000) })
+        .where(eq(participants.id, participantId));
+    }
     throw new DomainError(
       "WRONG_PIN",
       lock
@@ -119,13 +123,15 @@ export async function setNewPin(
 ): Promise<Participant> {
   void now;
   const p = await getParticipant(db, participantId);
-  if (p.pinHash) throw new DomainError("PIN_NOT_RESET", "PIN이 초기화된 경우에만 새로 설정할 수 있어요.");
+  const notReset = () => new DomainError("PIN_NOT_RESET", "PIN이 초기화된 경우에만 새로 설정할 수 있어요.");
+  if (p.pinHash) throw notReset();
   assertValidPin(pin);
   const [updated] = await db
     .update(participants)
     .set({ pinHash: await hashPin(pin), failedPinAttempts: 0, pinLockedUntil: null })
-    .where(eq(participants.id, participantId))
+    .where(and(eq(participants.id, participantId), isNull(participants.pinHash)))
     .returning();
+  if (!updated) throw notReset();
   return updated;
 }
 
