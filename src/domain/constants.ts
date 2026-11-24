@@ -1,0 +1,16 @@
+export const MIN_PARTICIPANTS = 4;
+export const RECORD_POINTS = 10;
+export const RECORD_DAILY_CAP = 3;
+export const MISSION_POINTS = 10;
+export const HIT_BONUS = 20;
+export const RECOGNIZED_BONUS = 20;
+export const VERDICT_BONUS = 5;
+export const SECRET_DEED_BONUS = 5;
+export const GUESS_BONUS = 50;
+export const BASE_TEMP = 36.5;
+export const MAX_TEMP = 100;
+export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "🥹"] as const;
+export const BODY_MAX = 500;
+export const NAME_MAX = 20;
+export const PIN_MAX_FAILS = 5;
+export const PIN_LOCK_MINUTES = 5;
