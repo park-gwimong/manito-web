@@ -1,12 +1,16 @@
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
-import { getLobby } from "@/domain/views";
+import { getFeed, getHeader, getLobby } from "@/domain/views";
 import { formatKst } from "@/lib/format";
 import { getViewer, listLoginCandidates } from "@/lib/viewer";
 import { Screen } from "../../_components/ui";
+import { AutoRefresh } from "./_components/AutoRefresh";
+import { Feed } from "./_components/Feed";
+import { Header } from "./_components/Header";
 import { JoinForm } from "./_components/JoinForm";
 import { Lobby } from "./_components/Lobby";
 import { LoginForm } from "./_components/LoginForm";
+import { RecordForm } from "./_components/RecordForm";
 
 export default async function EventPage({ params }: PageProps<"/e/[code]">) {
   const viewer = await getViewer((await params).code);
@@ -64,11 +68,25 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
     );
   }
 
-  // 진행·마감·공개 단계의 홈은 다음 작업에서 채운다.
+  // 마감·공개 단계의 홈 본 화면은 다음 작업에서 채운다. 지금은 읽기 전용 피드만 보여 준다.
+  const db = getDb();
+  const active = event.status === "active";
+  const [header, feed] = await Promise.all([
+    getHeader(db, event, new Date()),
+    getFeed(db, event.id, me.id),
+  ]);
   return (
     <Screen>
-      <h1 className="font-display text-4xl leading-tight text-ink">{event.name}</h1>
-      <p className="text-ink-soft">마니또가 시작됐어요.</p>
+      {active && <AutoRefresh />}
+      <Header eventName={event.name} temperature={header.temperature} dday={header.dday} />
+      {active ? (
+        <RecordForm code={event.code} />
+      ) : (
+        <p role="status" className="rounded-field bg-sun-tint px-4 py-3 text-sm font-medium text-ink">
+          이벤트가 끝났어요
+        </p>
+      )}
+      <Feed code={event.code} items={feed} readOnly={!active} />
     </Screen>
   );
 }

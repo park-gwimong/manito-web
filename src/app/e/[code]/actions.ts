@@ -2,7 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
+import { completeMission } from "@/domain/missions";
 import { acknowledgePinReset, joinEvent, loginWithPin, setNewPin } from "@/domain/participants";
+import {
+  addSecretDeed,
+  createRecord,
+  deleteRecord,
+  deleteSecretDeed,
+  setVerdict,
+  toggleReaction,
+  updateRecord,
+} from "@/domain/records";
+import { DomainError } from "@/domain/errors";
 import { runAction, str, type ActionResult } from "@/lib/action";
 import { requireEvent, requireMe, requireMember, setSession } from "@/lib/viewer";
 
@@ -44,5 +55,64 @@ export async function ackPinResetAction(code: string): Promise<ActionResult> {
   return act(async () => {
     const { me } = await requireMe(str(code));
     await acknowledgePinReset(getDb(), me.id);
+  });
+}
+
+// ---- 진행 화면 (기록, 반응, 판정, 임무) ----
+
+export async function createRecordAction(code: string, body: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await createRecord(getDb(), me.id, str(body), new Date());
+  });
+}
+
+export async function updateRecordAction(code: string, recordId: string, body: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await updateRecord(getDb(), me.id, str(recordId), str(body), new Date());
+  });
+}
+
+export async function deleteRecordAction(code: string, recordId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await deleteRecord(getDb(), me.id, str(recordId), new Date());
+  });
+}
+
+export async function toggleReactionAction(code: string, recordId: string, emoji: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await toggleReaction(getDb(), me.id, str(recordId), str(emoji), new Date());
+  });
+}
+
+export async function setVerdictAction(code: string, recordId: string, isMine: boolean): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    if (typeof isMine !== "boolean") throw new DomainError("INVALID_VERDICT", "판정 값이 올바르지 않아요.");
+    await setVerdict(getDb(), me.id, str(recordId), isMine, new Date());
+  });
+}
+
+export async function completeMissionAction(code: string, deliveryId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await completeMission(getDb(), me.id, str(deliveryId), new Date());
+  });
+}
+
+export async function addSecretDeedAction(code: string, body: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await addSecretDeed(getDb(), me.id, str(body), new Date());
+  });
+}
+
+export async function deleteSecretDeedAction(code: string, deedId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await deleteSecretDeed(getDb(), me.id, str(deedId), new Date());
   });
 }
