@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 export function TabBar({ code, isOrganizer }: { code: string; isOrganizer: boolean }) {
   const pathname = usePathname();
   const base = `/e/${code}`;
+  // 발표 화면은 큰 화면 전체를 쓴다.
+  if (pathname === `${base}/present`) return null;
   const tabs = [
     { href: base, label: "홈" },
     { href: `${base}/duty`, label: "내 임무" },

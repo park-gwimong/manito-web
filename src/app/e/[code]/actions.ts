@@ -2,8 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
-import { completeMission } from "@/domain/missions";
-import { acknowledgePinReset, joinEvent, loginWithPin, setNewPin } from "@/domain/participants";
+import { updateEventSettings } from "@/domain/events";
+import { addTemplate, completeMission, deleteTemplate, updateTemplate } from "@/domain/missions";
+import {
+  acknowledgePinReset,
+  joinEvent,
+  loginWithPin,
+  removeParticipant,
+  resetOrganizerPin,
+  resetPin,
+  setNewPin,
+} from "@/domain/participants";
 import {
   addSecretDeed,
   createRecord,
@@ -13,8 +22,10 @@ import {
   toggleReaction,
   updateRecord,
 } from "@/domain/records";
+import { finishPresentation, setGuess, startPresentation } from "@/domain/reveal";
 import { DomainError } from "@/domain/errors";
 import { runAction, str, type ActionResult } from "@/lib/action";
+import { parseKstInput } from "@/lib/format";
 import { requireEvent, requireMe, requireMember, setSession } from "@/lib/viewer";
 
 /** 성공했을 때만 이벤트 화면 전체를 다시 그린다. */
@@ -114,5 +125,95 @@ export async function deleteSecretDeedAction(code: string, deedId: string): Prom
   return act(async () => {
     const { me } = await requireMe(str(code));
     await deleteSecretDeed(getDb(), me.id, str(deedId), new Date());
+  });
+}
+
+// ---- 설정, 마감, 발표 (개설자 권한은 도메인 함수가 다시 확인한다) ----
+
+function requireDate(value: string, label: string): Date {
+  const d = parseKstInput(value);
+  if (!d) throw new DomainError("INVALID_DATE", `${label}를 입력해 주세요.`);
+  return d;
+}
+
+export async function updateSettingsAction(code: string, formData: FormData): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    const missionRaw = str(formData.get("missionCount")).trim();
+    await updateEventSettings(
+      getDb(),
+      me.id,
+      {
+        name: str(formData.get("name")),
+        startsAt: requireDate(str(formData.get("startsAt")), "시작 일시"),
+        endsAt: requireDate(str(formData.get("endsAt")), "종료 일시"),
+        missionCount: missionRaw === "" ? Number.NaN : Number(missionRaw),
+      },
+      new Date(),
+    );
+  });
+}
+
+export async function addTemplateAction(code: string, body: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await addTemplate(getDb(), me.id, str(body), new Date());
+  });
+}
+
+export async function updateTemplateAction(code: string, templateId: string, body: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await updateTemplate(getDb(), me.id, str(templateId), str(body), new Date());
+  });
+}
+
+export async function deleteTemplateAction(code: string, templateId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await deleteTemplate(getDb(), me.id, str(templateId), new Date());
+  });
+}
+
+export async function removeParticipantAction(code: string, targetId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await removeParticipant(getDb(), me.id, str(targetId));
+  });
+}
+
+export async function resetPinAction(code: string, targetId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await resetPin(getDb(), me.id, str(targetId), new Date());
+  });
+}
+
+/** 로그인 화면에서 쓰므로 세션 없이 동작한다. 관리 비밀번호가 곧 자격이다. */
+export async function resetOrganizerPinAction(code: string, adminPassword: string): Promise<ActionResult> {
+  return act(async () => {
+    const event = await requireEvent(str(code));
+    await resetOrganizerPin(getDb(), event.id, str(adminPassword), new Date());
+  });
+}
+
+export async function setGuessAction(code: string, guessedId: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await setGuess(getDb(), me.id, str(guessedId), new Date());
+  });
+}
+
+export async function startPresentationAction(code: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await startPresentation(getDb(), me.id, new Date());
+  });
+}
+
+export async function finishPresentationAction(code: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await finishPresentation(getDb(), me.id, new Date());
   });
 }

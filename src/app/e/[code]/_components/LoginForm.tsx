@@ -1,10 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Button, ErrorText, PinField } from "../../../_components/ui";
+import { Button, ErrorText, Field, PinField } from "../../../_components/ui";
 import type { ActionResult } from "@/lib/action";
 import type { LoginCandidate } from "@/lib/viewer";
-import { loginAction, setNewPinAction } from "../actions";
+import { loginAction, resetOrganizerPinAction, setNewPinAction } from "../actions";
 
 export function LoginForm({ code, candidates }: { code: string; candidates: LoginCandidate[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -25,6 +25,7 @@ export function LoginForm({ code, candidates }: { code: string; candidates: Logi
   );
 
   return (
+    <div className="flex flex-col gap-4">
     <form action={formAction} className="flex flex-col gap-4">
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 text-sm font-semibold">내 이름을 골라 주세요</legend>
@@ -68,5 +69,43 @@ export function LoginForm({ code, candidates }: { code: string; candidates: Logi
         </div>
       )}
     </form>
+    <OrganizerPinReset code={code} />
+    </div>
+  );
+}
+
+/** 개설자가 PIN을 잊었을 때. 관리 비밀번호로 개설자 PIN을 초기화한다(세션 불필요). */
+function OrganizerPinReset({ code }: { code: string }) {
+  const [state, formAction, pending] = useActionState(
+    (_prev: ActionResult | null, formData: FormData) =>
+      resetOrganizerPinAction(code, String(formData.get("adminPassword") ?? "")),
+    null,
+  );
+
+  return (
+    <details className="group rounded-field border-2 border-dashed border-line px-4 py-3">
+      <summary className="cursor-pointer list-none text-sm font-semibold text-ink-soft">
+        개설자 PIN을 잊었어요
+      </summary>
+      <form action={formAction} className="flex flex-col gap-3 pt-3">
+        <Field
+          label="관리 비밀번호"
+          name="adminPassword"
+          type="password"
+          autoComplete="off"
+          hint="이벤트를 만들 때 쓴 관리 비밀번호예요."
+          required
+        />
+        <ErrorText>{state && !state.ok ? state.error : null}</ErrorText>
+        {state?.ok && (
+          <p role="status" className="rounded-field bg-sun-tint px-4 py-3 text-sm font-medium">
+            개설자 PIN을 초기화했어요. 개설자 이름을 골라 새 PIN을 정해 주세요.
+          </p>
+        )}
+        <Button type="submit" variant="soft" disabled={pending}>
+          {pending ? "확인하는 중…" : "PIN 초기화"}
+        </Button>
+      </form>
+    </details>
   );
 }
