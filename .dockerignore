@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.superpowers
+.env
+.env.local
+.env.production
+docs
+Dockerfile
+docker-compose*.yml
+*.md
+tsconfig.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
