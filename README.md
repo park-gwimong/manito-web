@@ -78,13 +78,18 @@ yarn seed:demo <단계>      # preparing | active | closed | revealed
 1. **서버 생성** — NCP 콘솔에서 Ubuntu 서버(1 vCPU / 2GB 이상)를 만들고 공인 IP를 붙입니다.
 2. **Docker 설치** — 서버에 접속해 Docker Engine과 Compose 플러그인을 설치합니다. ([공식 설치 문서](https://docs.docker.com/engine/install/ubuntu/))
 3. **ACG에서 80/443 열기** — 서버에 연결된 ACG(방화벽)의 인바운드에 TCP 80, 443을 허용합니다. SSH(22)는 관리하는 IP로 제한하세요. 3000과 5432는 열지 않습니다.
-4. **`.env` 작성** — 서버에서 저장소를 clone하고 `.env.example`을 복사해 값을 채웁니다.
+4. **`.env` 작성** — 서버에서 저장소를 clone하고 `.env.example`을 복사한 뒤, 비밀값 세 개를 **반드시 새로 만들어 교체**합니다. 이 페이지는 공개되고 `ADMIN_PASSWORD`가 `/new`(이벤트 개설)를 지키므로, `change-me` 같은 예시 값을 운영에 그대로 쓰면 안 됩니다. (`POSTGRES_PASSWORD`는 비어 있는 경우만 compose가 막으므로 `change-me`도 통과해 버립니다.)
 
    ```bash
    cp .env.example .env
-   openssl rand -base64 48    # SESSION_SECRET
-   openssl rand -hex 24       # POSTGRES_PASSWORD
+   sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 48)|" .env
+   sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+   sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$(openssl rand -hex 12)|" .env
+   grep -n "change-me" .env    # 아무것도 나오지 않아야 합니다
+   grep ADMIN_PASSWORD .env    # 개설할 때 쓸 비밀번호이니 따로 적어 두세요
    ```
+
+   `DATABASE_URL`은 compose가 `POSTGRES_*`로 다시 만들므로 운영에서는 쓰이지 않습니다(`grep change-me`에 이 줄이 남아 나오는 것은 무시해도 됩니다). 직접 편집하려면 `SESSION_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD` 세 줄을 각각 원하는 강한 값으로 바꾸면 됩니다.
 
 5. **실행** — 이미지를 빌드해 백그라운드로 띄웁니다. 앱은 시작할 때 마이그레이션을 먼저 적용하고, 실패하면 서버가 뜨지 않습니다(`docker compose logs app`으로 확인).
 
