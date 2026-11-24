@@ -71,7 +71,7 @@ yarn seed:demo <단계>      # preparing | active | closed | revealed
 | `SESSION_SECRET` | 세션 쿠키 서명 키. **길고 무작위인 문자열**이어야 합니다. `openssl rand -base64 48` 로 만드세요. 바꾸면 모든 사용자가 로그아웃됩니다. |
 | `ADMIN_PASSWORD` | 관리용 비밀번호 |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Compose가 만드는 DB 설정. 비밀번호는 URL에 들어가므로 영문·숫자만 쓰세요 (`openssl rand -hex 24`). |
-| `APP_PORT` | 호스트에 공개할 앱 포트 (기본 `3000`) |
+| `APP_PORT` | 앱을 공개할 호스트 포트 (기본 `3000`). 루프백(`127.0.0.1`)에만 열립니다. |
 
 ## NCP 배포
 
@@ -85,11 +85,11 @@ yarn seed:demo <단계>      # preparing | active | closed | revealed
    sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 48)|" .env
    sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
    sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$(openssl rand -hex 12)|" .env
-   grep -n "change-me" .env    # 아무것도 나오지 않아야 합니다
+   grep -n "change-me" .env | grep -v DATABASE_URL    # 아무것도 나오지 않아야 합니다
    grep ADMIN_PASSWORD .env    # 개설할 때 쓸 비밀번호이니 따로 적어 두세요
    ```
 
-   `DATABASE_URL`은 compose가 `POSTGRES_*`로 다시 만들므로 운영에서는 쓰이지 않습니다(`grep change-me`에 이 줄이 남아 나오는 것은 무시해도 됩니다). 직접 편집하려면 `SESSION_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD` 세 줄을 각각 원하는 강한 값으로 바꾸면 됩니다.
+   `DATABASE_URL`은 compose가 `POSTGRES_*`로 다시 만들므로 운영에서는 쓰이지 않습니다(그래서 위 확인 명령은 이 줄을 빼고 봅니다). 직접 편집하려면 `SESSION_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD` 세 줄을 각각 원하는 강한 값으로 바꾸면 됩니다.
 
 5. **실행** — 이미지를 빌드해 백그라운드로 띄웁니다. 앱은 시작할 때 마이그레이션을 먼저 적용하고, 실패하면 서버가 뜨지 않습니다(`docker compose logs app`으로 확인).
 
@@ -97,7 +97,7 @@ yarn seed:demo <단계>      # preparing | active | closed | revealed
    docker compose up -d --build
    ```
 
-   DB는 이름 있는 볼륨(`pgdata`)에 저장되며 외부로 포트를 공개하지 않습니다. 앱은 호스트의 3000 포트로 열립니다.
+   DB는 이름 있는 볼륨(`pgdata`)에 저장되며 외부로 포트를 공개하지 않습니다. 앱은 호스트의 루프백 주소 `127.0.0.1:3000`으로만 열리므로, 바깥에서는 아래 Caddy를 통해서만 접속할 수 있습니다.
 
 6. **리버스 프록시와 HTTPS (Caddy 권장)** — **세션 쿠키는 운영 환경에서 `secure` 속성이 붙으므로 반드시 HTTPS로 서비스해야 합니다.** 일반 HTTP로 접속하면 브라우저가 쿠키를 저장하지 않아 로그인이 오류 없이 조용히 실패합니다. 도메인을 서버 공인 IP로 연결한 뒤 Caddy를 설치하고(`apt install caddy`) `/etc/caddy/Caddyfile`을 다음처럼 작성합니다. 인증서는 Caddy가 자동으로 발급·갱신합니다.
 

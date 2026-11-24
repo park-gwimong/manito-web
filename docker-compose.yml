@@ -27,7 +27,8 @@ services:
       # 컨테이너 안에서는 서비스 이름 db로 접속한다. .env의 DATABASE_URL(로컬 개발용)을 덮어쓴다.
       DATABASE_URL: postgres://${POSTGRES_USER:-manito}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-manito}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # 같은 호스트의 Caddy만 접근하도록 루프백에만 공개한다.
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
 
 volumes:
   pgdata:
