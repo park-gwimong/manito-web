@@ -10,6 +10,15 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-24-manito-design.md` (실행자는 이 문서도 함께 읽는다)
 
+> **실행 결과 (2026-11-24):** 12개 작업과 최종 검토를 마쳤다. 실행 중 아래 항목이 이 계획과 다르게 구현되었고, 설계 문서(Spec)에 반영되어 있다. 차이가 있으면 설계 문서가 기준이다.
+> - PIN 잠금: 5분 고정이 아니라 5분부터 두 배씩 늘어 최대 24시간 (`PIN_LOCK_MAX_MINUTES = 1440`).
+> - PIN 초기화: `participants.lastPinResetAt` 컬럼 추가(마이그레이션 `0001`). 초기화 이전 세션은 무효가 되고, 참가자 홈에 지워지지 않는 초기화 문구가 남는다.
+> - `reveal.ts`에 `countUnguessed(db, eventId)` 추가, 설정 화면에 미추측 인원 표시.
+> - 발표 슬라이드 컴포넌트 파일명은 `Slides.tsx`가 아니라 `SlideDeck.tsx` (`slides.ts`와 대소문자 충돌 회피).
+> - `next.config.ts`에서 `cacheComponents`, `partialPrefetching` 제거. vitest 제한 시간 20초.
+> - 마감 단계에서도 30초 간격 자동 새로고침. 앱 포트는 `127.0.0.1`에만 공개.
+> - `src/lib/viewer.ts`의 참가자 조회는 `src/domain/participants.ts`의 `getMember`, `listLoginCandidates`로 옮겼다.
+
 ## Global Constraints
 
 - **비밀 정보:** 배정, 판정 값, 몰래 한 일, 남의 미션은 `src/domain/` 밖으로 나갈 때 "요청한 사람이 볼 자격이 있는 것"만 담는다. 클라이언트 컴포넌트 props에 전체 데이터를 넘기고 화면에서 숨기는 방식은 금지.

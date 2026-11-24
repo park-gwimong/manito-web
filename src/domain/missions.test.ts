@@ -2,7 +2,7 @@ import { beforeAll, expect, test } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb } from "@/db/test-db";
-import { missionDeliveries, type Event, type Participant } from "@/db/schema";
+import { missionDeliveries, type Participant } from "@/db/schema";
 import { createEvent } from "./events";
 import { joinEvent } from "./participants";
 import { advanceEvent } from "./lifecycle";
