@@ -1,11 +1,12 @@
 import type { RevealData } from "@/domain/reveal";
 import { formatTemp } from "@/lib/format";
 import { Card } from "../../../_components/ui";
+import { ScoreLines } from "./ScoreLines";
 import { AWARD_META, resultLabel } from "./slides";
 
 /** 발표가 끝난 뒤 모두가 보는 결과. 서버에서 그려지고 상호작용이 없다. 등수 숫자는 쓰지 않는다. */
 export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
-  const { summary, chain, scores, awards } = data;
+  const { summary, chain, scores, awards, missions } = data;
   const max = Math.max(1, ...scores.map((s) => s.score.total));
   const given = AWARD_META.filter((a) => awards[a.key].length > 0);
 
@@ -104,8 +105,30 @@ export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
         </Card>
       )}
 
+      {missions.length > 0 && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-display text-xl">이번 미션 목록</h2>
+            <p className="text-sm leading-relaxed text-ink-soft">
+              진행 중에는 각자 받은 미션만 볼 수 있었어요. 이 {missions.length}개 중에서 사람마다 무작위로 받았어요.
+            </p>
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {missions.map((m) => (
+              <li key={m.body} className="flex flex-col gap-0.5 rounded-field bg-paper px-3 py-2 text-sm">
+                <span className="leading-relaxed">{m.body}</span>
+                {m.completedBy.length > 0 && (
+                  <span className="text-xs font-semibold text-berry-deep">해낸 사람: {m.completedBy.join(", ")}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card>
-        <h2 className="mb-4 font-display text-xl">최종 점수</h2>
+        <h2 className="font-display text-xl">최종 점수</h2>
+        <p className="mb-4 text-sm text-ink-soft">이름 아래에 어디서 받은 점수인지 나와요.</p>
         <ul className="flex flex-col gap-4">
           {scores.map((s) => {
             const isMe = s.id === meId;
@@ -128,6 +151,7 @@ export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
                     style={{ width: `${(s.score.total / max) * 100}%` }}
                   />
                 </div>
+                <ScoreLines lines={s.score.lines} />
               </li>
             );
           })}

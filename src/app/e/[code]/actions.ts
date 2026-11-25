@@ -28,6 +28,7 @@ import { changeEndsAt, closeNow, startNow } from "@/domain/lifecycle";
 import { removeSubscription, saveSubscription } from "@/domain/notifications";
 import { flushNotifications } from "@/lib/push";
 import { DomainError } from "@/domain/errors";
+import { DEFAULT_MISSION_HOUR, type MissionMode } from "@/domain/mission-plan";
 import { runAction, str, type ActionResult } from "@/lib/action";
 import { parseKstInput } from "@/lib/format";
 import { requireEvent, requireMe, requireMember, setSession } from "@/lib/viewer";
@@ -156,6 +157,9 @@ export async function updateSettingsAction(code: string, formData: FormData): Pr
         startsAt: requireDate(str(formData.get("startsAt")), "시작 일시"),
         endsAt: requireDate(str(formData.get("endsAt")), "종료 일시"),
         missionCount: missionRaw === "" ? Number.NaN : Number(missionRaw),
+        missionMode: str(formData.get("missionMode")) as MissionMode,
+        // custom에서는 도착 시각 칸이 없으므로 기본값을 쓴다.
+        missionHour: formData.get("missionHour") === null ? DEFAULT_MISSION_HOUR : Number(str(formData.get("missionHour"))),
       },
       new Date(),
     );

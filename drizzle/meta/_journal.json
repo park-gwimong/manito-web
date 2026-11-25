@@ -29,6 +29,13 @@
       "when": 1795581450417,
       "tag": "0003_giant_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795587647335,
+      "tag": "0004_slimy_virginia_dare",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import {
   events,
   guesses,
   missionDeliveries,
+  missionTemplates,
   participants,
   records,
   secretDeeds,
@@ -25,6 +26,11 @@ export type RevealData = {
     guess: { name: string; correct: boolean } | null;
   }[];
   scores: { id: string; name: string; score: FinalScore }[];
+  /**
+   * 이 이벤트의 미션 목록 전체. 진행 중에는 참가자가 자기에게 온 미션만 보므로, 목록은 여기서 처음 공개된다.
+   * 해낸 사람만 싣는다. 받고도 못 한 사람은 드러내지 않는다. 해낸 사람이 많은 순.
+   */
+  missions: { body: string; completedBy: string[] }[];
   awards: {
     nunchi: string[];
     heotdari: string[];
@@ -150,7 +156,7 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     .orderBy(asc(participants.createdAt), asc(participants.id));
   const nameOf = new Map(members.map((m) => [m.id, m.name]));
 
-  const [assignmentRows, recordRows, deedRows, guessRows, missionRows, scoreMap, temp] = await Promise.all([
+  const [assignmentRows, recordRows, deedRows, guessRows, missionRows, templateRows, scoreMap, temp] = await Promise.all([
     db.select().from(assignments).where(eq(assignments.eventId, eventId)),
     db
       .select({
@@ -171,9 +177,14 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
       .orderBy(asc(secretDeeds.createdAt), asc(secretDeeds.id)),
     db.select().from(guesses),
     db
-      .select({ participantId: missionDeliveries.participantId })
+      .select({ participantId: missionDeliveries.participantId, body: missionDeliveries.body })
       .from(missionDeliveries)
       .where(and(eq(missionDeliveries.eventId, eventId), isNotNull(missionDeliveries.completedAt))),
+    db
+      .select({ body: missionTemplates.body })
+      .from(missionTemplates)
+      .where(eq(missionTemplates.eventId, eventId))
+      .orderBy(asc(missionTemplates.id)),
     finalScores(db, eventId),
     temperature(db, event),
   ]);
@@ -216,10 +227,21 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     return m;
   };
 
+  // 미션은 본문으로 묶는다(배달된 미션은 목록의 본문을 복사해 둔 것이다).
+  const doneBy = new Map<string, string[]>();
+  for (const body of new Set([...templateRows.map((t) => t.body), ...missionRows.map((m) => m.body)])) {
+    doneBy.set(body, []);
+  }
+  for (const m of missionRows) doneBy.get(m.body)!.push(nameOf.get(m.participantId) ?? "");
+  const missions = [...doneBy]
+    .map(([body, names]) => ({ body, completedBy: names.filter(Boolean).sort((a, b) => a.localeCompare(b)) }))
+    .sort((a, b) => b.completedBy.length - a.completedBy.length);
+
   return {
     summary: { temperature: temp, recordCount: recordRows.length, missionsCompleted: missionRows.length },
     chain,
     scores,
+    missions,
     awards: {
       nunchi: topNames(tally(recordRows.filter((r) => r.isMine === true).map((r) => r.authorId)), nameOf),
       heotdari: topNames(tally(recordRows.filter((r) => r.isMine === false).map((r) => r.authorId)), nameOf),

@@ -13,7 +13,7 @@ import {
 } from "@/db/schema";
 import { MIN_PARTICIPANTS } from "./constants";
 import { getTargetOf } from "./lifecycle";
-import { kstDayKey, livePoints, temperature } from "./scoring";
+import { kstDayKey, liveLines, temperature, type ScoreLine } from "./scoring";
 
 export type FeedItem = {
   id: string;
@@ -43,7 +43,8 @@ export type Duty = {
 };
 
 export type Ranking = {
-  entries: { id: string; name: string; points: number; isMe: boolean }[];
+  /** `lines`는 점수 내역(기록, 미션). 누구에게나 보여도 되는 정보만 들어 있다. */
+  entries: { id: string; name: string; points: number; lines: ScoreLine[]; isMe: boolean }[];
   stats: { recordCount: number; missionsDelivered: number; missionsCompleted: number };
 };
 
@@ -203,8 +204,8 @@ export async function getDuty(db: Db, eventId: string, viewerId: string): Promis
 }
 
 export async function getRanking(db: Db, eventId: string, viewerId: string): Promise<Ranking> {
-  const [points, members, recordRows, deliveryRows] = await Promise.all([
-    livePoints(db, eventId),
+  const [lines, members, recordRows, deliveryRows] = await Promise.all([
+    liveLines(db, eventId),
     db.select({ id: participants.id, name: participants.name }).from(participants).where(eq(participants.eventId, eventId)),
     db.select({ id: records.id }).from(records).where(eq(records.eventId, eventId)),
     db
@@ -213,7 +214,10 @@ export async function getRanking(db: Db, eventId: string, viewerId: string): Pro
       .where(eq(missionDeliveries.eventId, eventId)),
   ]);
   const entries = members
-    .map((m) => ({ id: m.id, name: m.name, points: points.get(m.id) ?? 0, isMe: m.id === viewerId }))
+    .map((m) => {
+      const mine = lines.get(m.id) ?? [];
+      return { id: m.id, name: m.name, points: mine.reduce((sum, l) => sum + l.points, 0), lines: mine, isMe: m.id === viewerId };
+    })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
   return {
     entries,

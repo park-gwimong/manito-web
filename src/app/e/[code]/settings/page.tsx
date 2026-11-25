@@ -46,6 +46,8 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
             startsAtInput={toKstInput(event.startsAt)}
             endsAtInput={toKstInput(event.endsAt)}
             missionCount={event.missionCount}
+            missionMode={event.missionMode}
+            missionHour={event.missionHour}
             templateCount={templates.length}
           />
           <TemplateEditor code={event.code} templates={templates} />

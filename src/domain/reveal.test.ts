@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb } from "@/db/test-db";
 import { events, missionDeliveries, type Participant } from "@/db/schema";
+import { DEFAULT_MISSIONS } from "./default-missions";
 import { createEvent } from "./events";
 import { joinEvent } from "./participants";
 import { advanceEvent, getGiverIdOf } from "./lifecycle";
@@ -226,7 +227,11 @@ test("awards: 동점이면 둘 다, 아무도 해당 없으면 빈 배열", asyn
   await advanceEvent(db, event.id, closedAt);
   await startPresentation(db, members[0].id, closedAt);
 
-  const { awards } = await getRevealData(db, event.id, members[0].id);
+  const { awards, missions } = await getRevealData(db, event.id, members[0].id);
+  // 미션 목록 전체가 공개되고, 해낸 사람만 이름이 붙는다.
+  expect(missions).toHaveLength(DEFAULT_MISSIONS.length);
+  expect(missions[0]).toEqual({ body: delivery.body, completedBy: [members[3].name] });
+  expect(missions.slice(1).every((m) => m.completedBy.length === 0)).toBe(true);
   expect([...awards.nunchi].sort()).toEqual([members[0].name, members[1].name].sort());
   expect(awards.heotdari).toEqual([]);
   expect(awards.shadow).toEqual([members[2].name]);

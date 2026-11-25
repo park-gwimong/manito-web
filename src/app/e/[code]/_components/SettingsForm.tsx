@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition, type FormEvent } from "react";
 import { scheduleProblems } from "@/lib/schedule-check";
+import type { MissionMode } from "@/domain/mission-plan";
 import type { ActionResult } from "@/lib/action";
+import { MissionPlanFields } from "../../../_components/MissionPlanFields";
 import { Button, Card, ErrorText, Field, ProblemList } from "../../../_components/ui";
 import { startPresentationAction, updateSettingsAction } from "../actions";
 
@@ -13,6 +15,8 @@ type Props = {
   startsAtInput: string;
   endsAtInput: string;
   missionCount: number;
+  missionMode: MissionMode;
+  missionHour: number;
   templateCount: number;
 };
 
@@ -32,6 +36,7 @@ export function SettingsForm(props: Props) {
         startsAt: String(data.get("startsAt") ?? ""),
         endsAt: String(data.get("endsAt") ?? ""),
         missionCount: String(data.get("missionCount") ?? ""),
+        missionMode: String(data.get("missionMode") ?? ""),
       },
       props.templateCount,
       new Date(),
@@ -54,16 +59,11 @@ export function SettingsForm(props: Props) {
           hint="한국 시간 기준이에요."
           required
         />
-        <Field
-          label="미션 개수"
-          name="missionCount"
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={props.templateCount}
-          defaultValue={props.missionCount}
-          hint={`미션 목록에 ${props.templateCount}개가 있어요. 그 안에서 정해 주세요.`}
-          required
+        <MissionPlanFields
+          defaultMode={props.missionMode}
+          defaultHour={props.missionHour}
+          defaultCount={props.missionCount}
+          maxMissions={props.templateCount}
         />
         <ProblemList problems={problems} />
         <ErrorText>{problems.length === 0 && state && !state.ok ? state.error : null}</ErrorText>

@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { assignments, events, participants, type Event, type Participant } from "@/db/schema";
 import { MIN_PARTICIPANTS } from "./constants";
 import { DomainError } from "./errors";
+import { plannedMissionCount } from "./mission-plan";
 import { deliverDueMissions } from "./missions";
 import { enqueue } from "./notifications";
 
@@ -128,7 +129,10 @@ export async function startNow(
         `${MIN_PARTICIPANTS}명부터 시작할 수 있어요. ${MIN_PARTICIPANTS - members.length}명 더 필요해요.`,
       );
     }
-    await tx.update(events).set({ startsAt: now, startMissedAt: null }).where(eq(events.id, event.id));
+    await tx
+      .update(events)
+      .set({ startsAt: now, startMissedAt: null, missionCount: plannedMissionCount({ ...event, startsAt: now }) })
+      .where(eq(events.id, event.id));
   });
   const started = await advanceEvent(db, me.eventId, now, rng);
   if (started.status === "preparing") {
@@ -146,9 +150,11 @@ export async function changeEndsAt(db: Db, organizerId: string, endsAt: Date, no
   if (endsAt.getTime() <= now.getTime()) {
     throw new DomainError("END_IN_PAST", "종료 일시는 지금보다 뒤여야 해요. 바로 끝내려면 지금 마감하기를 눌러 주세요.");
   }
+  const current = await loadEvent(db, me.eventId);
   const changed = await db
     .update(events)
-    .set({ endsAt })
+    // 매일·이틀 방식이면 새 기간에 맞는 개수로 바꾼다. 이미 도착한 미션의 시각은 달라지지 않는다.
+    .set({ endsAt, missionCount: plannedMissionCount({ ...current, endsAt }) })
     .where(and(eq(events.id, me.eventId), eq(events.status, "active")))
     .returning({ id: events.id });
   if (changed.length === 0) {

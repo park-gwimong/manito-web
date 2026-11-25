@@ -8,6 +8,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { MISSION_MODES } from "../domain/mission-plan";
 
 const tz = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -20,7 +21,12 @@ export const events = pgTable("events", {
   name: text("name").notNull(),
   startsAt: tz("starts_at").notNull(),
   endsAt: tz("ends_at").notNull(),
+  /** 한 사람이 받는 미션 수. 매일·이틀 방식에서는 일정에서 계산한 값을 저장해 둔다. */
   missionCount: integer("mission_count").notNull(),
+  /** 미션을 보내는 방식. 이 열이 생기기 전의 이벤트는 custom(개수를 기간에 고르게)이다. */
+  missionMode: text("mission_mode", { enum: MISSION_MODES }).notNull().default("custom"),
+  /** 매일·이틀 방식에서 미션이 도착하는 시각(한국 시간, 0~23). */
+  missionHour: integer("mission_hour").notNull().default(9),
   status: text("status", { enum: EVENT_STATUSES }).notNull().default("preparing"),
   startMissedAt: tz("start_missed_at"),
   presentationStartedAt: tz("presentation_started_at"),

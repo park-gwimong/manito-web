@@ -140,7 +140,17 @@ test("finalScores: 적중 2건, 인정 2건, 판정 3건, 몰래 한 일 1건, �
     secretDeed: 5,
     guess: 50,
     total: live + 40 + 40 + 15 + 5 + 50,
+    // 내역은 점수가 붙은 항목만, 합이 total과 같다.
+    lines: [
+      { key: "record", count: 2, points: 20 },
+      { key: "hit", count: 2, points: 40 },
+      { key: "recognized", count: 2, points: 40 },
+      { key: "verdict", count: 3, points: 15 },
+      { key: "secretDeed", count: 1, points: 5 },
+      { key: "guess", count: 1, points: 50 },
+    ],
   });
+  for (const s of scores.values()) expect(s.lines.reduce((sum, l) => sum + l.points, 0)).toBe(s.total);
   expect(scores.get(other.id)!.guess).toBe(0);
   expect(scores.size).toBe(members.length);
 });

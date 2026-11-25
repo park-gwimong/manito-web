@@ -131,12 +131,12 @@ test("마감 후 미션 완료는 NOT_ACTIVE", async () => {
 });
 
 test("템플릿을 missionCount 아래로 지우면 TOO_FEW_TEMPLATES", async () => {
-  const { organizer, event } = await setup(30);
+  const { organizer, event } = await setup(60);
   const [first] = await listTemplates(db, event.id);
   await expect(deleteTemplate(db, organizer.id, first.id, now)).rejects.toMatchObject({
     code: "TOO_FEW_TEMPLATES",
   });
-  expect(await listTemplates(db, event.id)).toHaveLength(30);
+  expect(await listTemplates(db, event.id)).toHaveLength(60);
 });
 
 test("템플릿 추가/수정/삭제 (개수 여유가 있을 때)", async () => {

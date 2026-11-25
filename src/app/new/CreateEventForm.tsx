@@ -2,13 +2,23 @@
 
 import { useActionState, useState, type FormEvent } from "react";
 import { scheduleProblems } from "@/lib/schedule-check";
+import { DEFAULT_MISSION_HOUR, DEFAULT_MISSION_MODE, type MissionMode } from "@/domain/mission-plan";
+import { MissionPlanFields } from "../_components/MissionPlanFields";
 import { Button, Card, ErrorText, Field, PinField, ProblemList } from "../_components/ui";
 import type { ActionResult } from "@/lib/action";
 import { createEventAction } from "./actions";
 
 /** 실패해도 다시 채워 둘 값. PIN과 관리 비밀번호는 되돌려 보여 주지 않는다. */
-type Kept = { name: string; startsAt: string; endsAt: string; missionCount: string; organizerName: string };
-const KEPT_FIELDS = ["name", "startsAt", "endsAt", "missionCount", "organizerName"] as const;
+type Kept = {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  missionCount: string;
+  missionMode: string;
+  missionHour: string;
+  organizerName: string;
+};
+const KEPT_FIELDS = ["name", "startsAt", "endsAt", "missionCount", "missionMode", "missionHour", "organizerName"] as const;
 
 export function CreateEventForm({
   defaultStartsAt,
@@ -30,6 +40,7 @@ export function CreateEventForm({
         startsAt: String(data.get("startsAt") ?? ""),
         endsAt: String(data.get("endsAt") ?? ""),
         missionCount: String(data.get("missionCount") ?? ""),
+        missionMode: String(data.get("missionMode") ?? ""),
       },
       maxMissions,
       new Date(),
@@ -69,16 +80,13 @@ export function CreateEventForm({
           defaultValue={kept?.endsAt ?? defaultEndsAt}
           required
         />
-        <Field
-          label="미션 개수"
-          name="missionCount"
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={maxMissions}
-          defaultValue={kept?.missionCount ?? 5}
-          hint={`기간 동안 한 사람에게 나눠서 보내는 미션 수예요. 0개부터 ${maxMissions}개까지 정할 수 있어요.`}
-          required
+        {/* 실패한 뒤 다시 그릴 때 고른 값이 되살아나도록, 보낸 값이 바뀌면 새로 만든다. */}
+        <MissionPlanFields
+          key={kept ? `${kept.missionMode}-${kept.missionHour}-${kept.missionCount}` : "initial"}
+          defaultMode={(kept?.missionMode as MissionMode) || DEFAULT_MISSION_MODE}
+          defaultHour={kept?.missionHour ? Number(kept.missionHour) : DEFAULT_MISSION_HOUR}
+          defaultCount={kept?.missionCount || 5}
+          maxMissions={maxMissions}
         />
       </Card>
 
