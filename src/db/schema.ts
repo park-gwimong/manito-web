@@ -24,6 +24,8 @@ export const events = pgTable("events", {
   status: text("status", { enum: EVENT_STATUSES }).notNull().default("preparing"),
   startMissedAt: tz("start_missed_at"),
   presentationStartedAt: tz("presentation_started_at"),
+  /** 샘플 이벤트를 만든 시각. 값이 있으면 둘러보기용 샘플이고, 실제 이벤트는 항상 null이다. */
+  demoSeededAt: tz("demo_seeded_at"),
   createdAt: tz("created_at").notNull().defaultNow(),
 });
 

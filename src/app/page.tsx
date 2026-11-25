@@ -1,17 +1,21 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { BASE_TEMP } from "@/domain/constants";
-import { isDev } from "@/dev/overview";
+import { demoEnabled, isDev } from "@/dev/overview";
 import { formatTemp } from "@/lib/format";
 
-export default function Home() {
+export default async function Home() {
+  // 둘러보기 링크는 서버 설정(DEMO_MODE)에 달려 있어, 빌드할 때가 아니라 요청할 때 정한다.
+  await connection();
+  const dev = isDev();
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(3rem+env(safe-area-inset-bottom))] lg:max-w-6xl lg:justify-center lg:px-8">
-      {isDev() && (
+      {(dev || demoEnabled()) && (
         <Link
           href="/dev"
           className="flex items-center justify-between gap-3 rounded-pill bg-ink py-2 pr-2 pl-5 text-sm font-semibold text-paper lg:self-start"
         >
-          개발 서버예요. 샘플 이벤트로 기능을 둘러보세요
+          {dev ? "개발 서버예요. 샘플 이벤트로 기능을 둘러보세요" : "샘플 이벤트로 먼저 둘러볼 수 있어요"}
           <span className="rounded-pill bg-sun px-3 py-1.5 text-sun-ink">둘러보기</span>
         </Link>
       )}

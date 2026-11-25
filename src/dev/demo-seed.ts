@@ -4,8 +4,9 @@
  * 6명짜리 이벤트를 만들고 요청한 단계까지 도메인 함수로 진행시킨다.
  * 과거 시각을 `now`로 넘겨 시간이 흐른 것처럼 만들기 때문에, 쓰는 코드는 실제 서비스와 같다.
  */
+import { asc, eq, isNotNull } from "drizzle-orm";
 import type { Db } from "../db/client";
-import type { Event, Participant } from "../db/schema";
+import { events, type Event, type Participant } from "../db/schema";
 import { createEvent } from "../domain/events";
 import { advanceEvent, getGiverIdOf } from "../domain/lifecycle";
 import { completeMission } from "../domain/missions";
@@ -75,6 +76,11 @@ export async function seedDemo(db: Db, stage: DemoStage): Promise<{ event: Event
     },
     at(createdAt),
   );
+  // 샘플 표시. 둘러보기 화면이 운영에서 이 표시가 있는 이벤트만 다룬다.
+  const seededAt = at(real);
+  await db.update(events).set({ demoSeededAt: seededAt }).where(eq(events.id, event.id));
+  event.demoSeededAt = seededAt;
+
   const members = [organizer];
   for (const [i, name] of DEMO_NAMES.slice(1).entries()) {
     members.push(await joinEvent(db, event.id, { name, pin: DEMO_PIN }, at(createdAt + (i + 1) * 10 * MIN)));
@@ -148,4 +154,35 @@ export async function seedDemo(db: Db, stage: DemoStage): Promise<{ event: Event
   }
 
   return { event, members };
+}
+
+/** 샘플을 새로 만드는 주기. 며칠 지나면 단계가 저절로 넘어가므로 하루에 한 번 처음 상태로 되돌린다. */
+export const DEMO_REFRESH_MS = DAY;
+
+let refreshing = false;
+
+/**
+ * 운영의 둘러보기용(`DEMO_MODE=1`). 샘플이 없거나 만든 지 하루가 지났으면 지우고 단계별로 다시 만든다.
+ * 샘플 표시가 있는 이벤트만 지운다. 실제 이벤트는 건드리지 않는다.
+ * 새로 만들었으면 true.
+ */
+export async function refreshDemoEvents(db: Db, now: Date = new Date()): Promise<boolean> {
+  if (refreshing) return false;
+  refreshing = true;
+  try {
+    const demos = await db
+      .select({ seededAt: events.demoSeededAt })
+      .from(events)
+      .where(isNotNull(events.demoSeededAt))
+      .orderBy(asc(events.demoSeededAt));
+    const oldest = demos[0]?.seededAt;
+    const fresh = demos.length >= DEMO_STAGES.length && oldest && now.getTime() - oldest.getTime() < DEMO_REFRESH_MS;
+    if (fresh) return false;
+
+    await db.delete(events).where(isNotNull(events.demoSeededAt));
+    for (const stage of DEMO_STAGES) await seedDemo(db, stage);
+    return true;
+  } finally {
+    refreshing = false;
+  }
 }

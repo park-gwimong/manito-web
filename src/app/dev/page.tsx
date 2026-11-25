@@ -4,11 +4,11 @@ import { getDb } from "@/db/client";
 import type { EventStatus } from "@/db/schema";
 import { DEV_ADMIN_PASSWORD } from "@/dev/bootstrap";
 import { DEMO_PIN } from "@/dev/demo-seed";
-import { getDevOverview, isDev, type DevEvent } from "@/dev/overview";
+import { canTour, getDevOverview, isDev, type DevEvent } from "@/dev/overview";
 import { formatKst } from "@/lib/format";
 import { devEnterAction } from "./actions";
 
-export const metadata = { title: "둘러보기 (개발 전용)" };
+export const metadata = { title: "샘플로 둘러보기", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 const STAGE: Record<EventStatus, { label: string; summary: string; checks: string[] }> = {
@@ -51,45 +51,77 @@ const STAGE: Record<EventStatus, { label: string; summary: string; checks: strin
 };
 
 export default async function DevPage() {
-  if (!isDev()) notFound();
+  if (!canTour()) notFound();
+  const dev = isDev();
   const events = await getDevOverview(getDb());
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 pt-10 pb-20">
       <header className="flex flex-col gap-3">
-        <p className="w-fit rounded-pill bg-ink px-3 py-1 text-xs font-semibold text-paper">개발 서버에서만 보이는 화면</p>
+        <p className="w-fit rounded-pill bg-ink px-3 py-1 text-xs font-semibold text-paper">
+          {dev ? "개발 서버에서만 보이는 화면" : "샘플 데이터로 둘러보는 화면"}
+        </p>
         <h1 className="font-display text-4xl leading-tight text-ink">둘러보기</h1>
         <p className="max-w-prose leading-relaxed text-ink-soft">
           단계별 샘플 이벤트가 들어 있어요. 이름을 누르면 PIN 없이 그 사람으로 바로 들어갑니다. 원래는 아무도 볼 수
           없는 배정표도 여기에서는 보여 주니, 누구의 내 임무에서 판정 버튼이 보이는지 확인할 수 있어요.
         </p>
+        {!dev && (
+          <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+            누구나 함께 쓰는 연습용이에요. 여기에 쓴 글은 다른 사람에게도 보이고, 샘플은 하루에 한 번 처음 상태로
+            돌아가요. 실제 이벤트는 이 화면에 나오지 않아요.
+          </p>
+        )}
         <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-card border border-line bg-card px-5 py-4 text-sm">
           <div>
             <dt className="text-ink-soft">샘플 참가자 PIN</dt>
             <dd className="font-display text-xl text-ink">{DEMO_PIN}</dd>
           </div>
-          <div>
-            <dt className="text-ink-soft">관리 비밀번호 (이벤트 만들기)</dt>
-            <dd className="font-display text-xl text-ink">{process.env.ADMIN_PASSWORD === DEV_ADMIN_PASSWORD ? DEV_ADMIN_PASSWORD : ".env의 ADMIN_PASSWORD"}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">처음 상태로 되돌리기</dt>
-            <dd className="font-display text-xl text-ink">yarn dev:reset</dd>
-          </div>
+          {dev ? (
+            <>
+              <div>
+                <dt className="text-ink-soft">관리 비밀번호 (이벤트 만들기)</dt>
+                <dd className="font-display text-xl text-ink">
+                  {process.env.ADMIN_PASSWORD === DEV_ADMIN_PASSWORD ? DEV_ADMIN_PASSWORD : ".env의 ADMIN_PASSWORD"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">처음 상태로 되돌리기</dt>
+                <dd className="font-display text-xl text-ink">yarn dev:reset</dd>
+              </div>
+            </>
+          ) : (
+            <div>
+              <dt className="text-ink-soft">처음 상태로 돌아가는 때</dt>
+              <dd className="font-display text-xl text-ink">하루에 한 번</dd>
+            </div>
+          )}
         </dl>
       </header>
 
       {events.length === 0 ? (
         <p className="rounded-card border border-dashed border-line px-5 py-8 text-center text-ink-soft">
-          이벤트가 없어요. <code>yarn dev:reset</code> 후 개발 서버를 다시 켜면 샘플이 만들어져요.
+          {dev ? (
+            <>
+              이벤트가 없어요. <code>yarn dev:reset</code> 후 개발 서버를 다시 켜면 샘플이 만들어져요.
+            </>
+          ) : (
+            "샘플을 만드는 중이에요. 잠시 뒤에 새로 고쳐 주세요."
+          )}
         </p>
       ) : (
         events.map((event) => <EventSection key={event.id} event={event} />)
       )}
 
-      <Link href="/new" className="w-fit font-semibold text-berry-deep underline underline-offset-4">
-        새 이벤트를 직접 만들어 보기
-      </Link>
+      {dev ? (
+        <Link href="/new" className="w-fit font-semibold text-berry-deep underline underline-offset-4">
+          새 이벤트를 직접 만들어 보기
+        </Link>
+      ) : (
+        <Link href="/" className="w-fit font-semibold text-berry-deep underline underline-offset-4">
+          첫 화면으로
+        </Link>
+      )}
     </main>
   );
 }

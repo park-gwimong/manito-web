@@ -1,8 +1,11 @@
 /**
- * 개발 전용 둘러보기 화면(`/dev`)의 데이터.
- * 배정을 그대로 내보내므로 운영에서는 절대 불리면 안 된다. 모든 함수가 `assertDev()`로 시작한다.
+ * 둘러보기 화면(`/dev`)의 데이터.
+ *
+ * 배정을 그대로 내보내고 PIN 없이 들어가게 해 주므로, 실제 이벤트에는 절대 닿으면 안 된다.
+ * - 개발 서버: 모든 이벤트를 보여 준다.
+ * - 운영: `DEMO_MODE=1`일 때만 열리고, 샘플 이벤트(`demoSeededAt`이 있는 것)만 다룬다.
  */
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNotNull } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { assignments, events, participants, type EventStatus } from "../db/schema";
 
@@ -10,8 +13,19 @@ export function isDev(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
-export function assertDev(): void {
-  if (!isDev()) throw new Error("개발 서버에서만 쓸 수 있는 기능입니다.");
+/** 운영에서 샘플 둘러보기를 켰는지. */
+export function demoEnabled(): boolean {
+  return process.env.DEMO_MODE === "1";
+}
+
+/** 둘러보기 화면을 열 수 있는지. */
+export function canTour(): boolean {
+  return isDev() || demoEnabled();
+}
+
+/** PIN 없이 들어가거나 배정을 보여 줘도 되는 이벤트인지. 개발 서버가 아니면 샘플만 된다. */
+export function isTourable(event: { demoSeededAt: Date | null }): boolean {
+  return isDev() || (demoEnabled() && event.demoSeededAt !== null);
 }
 
 export type DevEvent = {
@@ -28,8 +42,10 @@ export type DevEvent = {
 const STATUS_ORDER: EventStatus[] = ["preparing", "active", "closed", "revealed"];
 
 export async function getDevOverview(db: Db): Promise<DevEvent[]> {
-  assertDev();
-  const rows = await db.select().from(events);
+  if (!canTour()) throw new Error("둘러보기가 꺼져 있습니다.");
+  const rows = isDev()
+    ? await db.select().from(events)
+    : await db.select().from(events).where(isNotNull(events.demoSeededAt));
   rows.sort(
     (a, b) =>
       STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || b.createdAt.getTime() - a.createdAt.getTime(),

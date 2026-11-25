@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "demo_seeded_at" timestamp with time zone;
