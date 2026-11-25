@@ -134,6 +134,18 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
   );
 }
 
+/** 사용 설명서로 가는 링크. 메뉴가 없는 화면(대기, 로그인) 아래에 둔다. */
+export function GuideLink({ children = "사용 설명서 보기" }: { children?: ReactNode }) {
+  return (
+    <Link
+      href="/guide"
+      className="flex min-h-11 items-center self-center text-sm font-semibold text-ink-soft underline underline-offset-4 hover:text-ink"
+    >
+      {children}
+    </Link>
+  );
+}
+
 /** 화면 안의 구역 제목. */
 export function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className="font-display text-xl text-ink">{children}</h2>;

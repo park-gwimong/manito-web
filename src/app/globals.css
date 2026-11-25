@@ -148,3 +148,119 @@ body {
     display: none;
   }
 }
+
+/* 사용 설명서(/guide). docs/USER_GUIDE.md를 변환한 본문이라 태그에 직접 모양을 준다. */
+.guide {
+  line-height: 1.75;
+  color: var(--color-ink);
+}
+.guide h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+.guide h2 {
+  font-size: 1.625rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+  margin-top: 3rem;
+  margin-bottom: 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-line);
+}
+.guide h3 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+/* 목차 링크로 건너뛰었을 때 제목이 화면 맨 위에 붙지 않게 한다. */
+.guide h2,
+.guide h3 {
+  scroll-margin-top: 1rem;
+}
+.guide p,
+.guide ul,
+.guide ol,
+.guide blockquote,
+.guide .guide-table {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.guide ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.guide ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+.guide li {
+  margin-top: 0.25rem;
+}
+.guide li > ul,
+.guide li > ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+.guide a {
+  color: var(--color-berry-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.guide strong {
+  font-weight: 700;
+}
+/* 버튼·메뉴 이름. 화면에서 찾을 글자라는 표시다. */
+.guide code {
+  font-family: inherit;
+  font-size: 0.9375em;
+  font-weight: 600;
+  padding: 0.1em 0.45em;
+  border-radius: 0.5rem;
+  background: var(--color-berry-tint);
+  color: var(--color-berry-deep);
+  white-space: nowrap;
+}
+.guide blockquote {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-field);
+  background: var(--color-sun-tint);
+  font-weight: 600;
+}
+.guide blockquote p {
+  margin: 0;
+}
+.guide .guide-table {
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-field);
+  background: var(--color-card);
+}
+.guide table {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.guide th,
+.guide td {
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-line);
+}
+.guide th {
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--color-paper);
+}
+.guide tr:last-child td {
+  border-bottom: 0;
+}

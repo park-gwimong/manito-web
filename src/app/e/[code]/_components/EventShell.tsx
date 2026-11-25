@@ -149,9 +149,14 @@ export function EventShell({
           </ul>
         </nav>
 
-        <p className="mt-auto px-1 text-sm text-ink-soft">
-          <span className="font-semibold text-ink">{myName}</span>님으로 들어와 있어요
-        </p>
+        <div className="mt-auto flex flex-col gap-1 px-1 text-sm text-ink-soft">
+          <Link href="/guide" className="flex min-h-9 items-center font-semibold underline underline-offset-4 hover:text-ink">
+            사용 설명서
+          </Link>
+          <p>
+            <span className="font-semibold text-ink">{myName}</span>님으로 들어와 있어요
+          </p>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>

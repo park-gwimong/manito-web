@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BASE_TEMP } from "@/domain/constants";
 import { ddayLabel, formatTemp } from "@/lib/format";
 import { Thermometer } from "./Thermometer";
@@ -28,6 +29,12 @@ export function Header({
           {formatTemp(BASE_TEMP)}에서 시작해 기록, 반응, 미션 완료처럼 모두가 한 일만큼 올라가요.
         </p>
       </div>
+      <Link
+        href="/guide"
+        className="-my-1 flex min-h-11 items-center self-end text-sm font-semibold text-ink-soft underline underline-offset-4"
+      >
+        사용 설명서
+      </Link>
     </header>
   );
 }

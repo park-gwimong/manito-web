@@ -6,7 +6,7 @@ import { getMyGuess } from "@/domain/reveal";
 import { getFeed, getHeader, getLobby } from "@/domain/views";
 import { formatKst } from "@/lib/format";
 import { getViewer, listLoginCandidates } from "@/lib/viewer";
-import { Screen } from "../../_components/ui";
+import { GuideLink, Screen } from "../../_components/ui";
 import { AutoRefresh } from "./_components/AutoRefresh";
 import { Feed } from "./_components/Feed";
 import { GuessForm } from "./_components/GuessForm";
@@ -61,6 +61,7 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
         ) : (
           <LoginForm code={event.code} candidates={candidates} />
         )}
+        <GuideLink>마니또가 처음이라면: 사용 설명서 보기</GuideLink>
       </Screen>
     );
   }

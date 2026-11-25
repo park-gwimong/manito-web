@@ -36,6 +36,12 @@ export default function Home() {
             <p className="text-sm leading-relaxed text-ink-soft">
               참가하려면 개설자에게 받은 초대 링크로 들어와 주세요.
             </p>
+            <Link
+              href="/guide"
+              className="flex min-h-11 items-center self-start text-sm font-semibold text-berry-deep underline underline-offset-4"
+            >
+              어떻게 하는 건지 자세히 보기
+            </Link>
           </div>
         </section>
 

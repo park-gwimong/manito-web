@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
-import { Button, Card, Screen } from "../../../_components/ui";
+import { Button, Card, GuideLink, Screen } from "../../../_components/ui";
 import { StartNowButton } from "./OrganizerControls";
 import { PinResetTrace } from "./PinResetTrace";
 
@@ -91,6 +91,7 @@ export function Lobby(props: Props) {
           </p>
         )}
       </Card>
+      <GuideLink />
     </Screen>
   );
 }
