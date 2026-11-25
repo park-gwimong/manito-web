@@ -12,7 +12,7 @@ export function ScoreLines({ lines }: { lines: ScoreLine[] }) {
       {lines.map((l) => (
         <li key={l.key}>
           {LABEL.get(l.key)}
-          {l.key !== "guess" && ` ${l.count}개`} <strong className="font-semibold text-ink">{l.points}점</strong>
+          {l.key === "secretDeed" ? ` ${l.count}일` : l.key !== "guess" && ` ${l.count}개`} <strong className="font-semibold text-ink">{l.points}점</strong>
           {l.skipped ? ` (하루 한도를 넘은 ${l.skipped}개는 점수 없음)` : ""}
         </li>
       ))}

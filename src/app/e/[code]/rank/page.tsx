@@ -83,7 +83,7 @@ export default async function RankPage({ params }: PageProps<"/e/[code]/rank">) 
               <li key={r.key} className="flex justify-between gap-3">
                 <span>{r.label}</span>
                 <span className="shrink-0 font-semibold text-ink">
-                  {r.key === "guess" ? `${r.each}점` : `한 개에 ${r.each}점`}
+                  {r.key === "guess" ? `${r.each}점` : r.key === "secretDeed" ? `하루에 ${r.each}점` : `한 개에 ${r.each}점`}
                 </span>
               </li>
             ))}

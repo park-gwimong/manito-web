@@ -44,7 +44,7 @@ export const SCORE_RULES: { key: ScoreKey; label: string; each: number; final: b
   { key: "hit", label: "알아챈 기록", each: HIT_BONUS, final: true },
   { key: "recognized", label: "알아봐 준 기록", each: RECOGNIZED_BONUS, final: true },
   { key: "verdict", label: "마니또 확인 참여", each: VERDICT_BONUS, final: true },
-  { key: "secretDeed", label: "몰래 한 일 메모", each: SECRET_DEED_BONUS, final: true },
+  { key: "secretDeed", label: "몰래 한 일 메모를 남긴 날", each: SECRET_DEED_BONUS, final: true },
   { key: "guess", label: "내 마니또 맞히기", each: GUESS_BONUS, final: true },
 ];
 
@@ -138,7 +138,10 @@ export async function finalScores(db: Db, eventId: string): Promise<Map<string, 
       .from(verdicts)
       .innerJoin(records, eq(records.id, verdicts.recordId))
       .where(eq(records.eventId, eventId)),
-    db.select({ giverId: secretDeeds.giverId }).from(secretDeeds).where(eq(secretDeeds.eventId, eventId)),
+    db
+      .select({ giverId: secretDeeds.giverId, createdAt: secretDeeds.createdAt })
+      .from(secretDeeds)
+      .where(eq(secretDeeds.eventId, eventId)),
     db.select().from(guesses).where(inArray(guesses.participantId, ids)),
   ]);
   const giverByReceiver = new Map(giverOf.map((a) => [a.receiverId, a.giverId]));
@@ -151,7 +154,9 @@ export async function finalScores(db: Db, eventId: string): Promise<Map<string, 
       if (judge) count(recognized, judge);
     }
   }
-  for (const d of deedRows) count(deeds, d.giverId);
+  // 많이 적는다고 점수가 늘지 않도록, 메모를 남긴 날(KST)마다 한 번만 센다.
+  const deedDays = new Set(deedRows.map((d) => `${d.giverId}|${kstDayKey(d.createdAt)}`));
+  for (const key of deedDays) count(deeds, key.split("|")[0]);
 
   for (const id of ids) {
     const guess = guessRows.find((g) => g.participantId === id);

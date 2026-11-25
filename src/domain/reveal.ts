@@ -14,10 +14,14 @@ import {
 import { DomainError } from "./errors";
 import { advanceEvent } from "./lifecycle";
 import { enqueue } from "./notifications";
-import { finalScores, temperature, type FinalScore } from "./scoring";
+import { finalScores, kstDayKey, temperature, type FinalScore } from "./scoring";
 
 export type RevealData = {
   summary: { temperature: number; recordCount: number; missionsCompleted: number };
+  /**
+   * 한 사람씩 공개하는 순서. 배정 고리를 따라간다(A의 마니또가 B면 다음은 B의 마니또).
+   * 점수와 무관하다. 선물을 나누는 모임은 공개되는 순서대로 고르면 된다.
+   */
   chain: {
     receiver: { id: string; name: string };
     giver: { id: string; name: string };
@@ -31,9 +35,11 @@ export type RevealData = {
    * 해낸 사람만 싣는다. 받고도 못 한 사람은 드러내지 않는다. 해낸 사람이 많은 순.
    */
   missions: { body: string; completedBy: string[] }[];
+  /** 부문마다 수상자는 한 명(해당자가 없으면 빈 배열). 그래서 수상자는 많아야 부문 수만큼이다. */
   awards: {
     nunchi: string[];
     heotdari: string[];
+    /** 그림자 마니또: 몰래 한 일 메모를 남긴 날이 가장 많은 사람. 하루에 몰아 적어도 하루로 센다. */
     shadow: string[];
     mission: string[];
   };
@@ -125,13 +131,23 @@ export async function finishPresentation(db: Db, organizerId: string, now: Date)
   }
 }
 
-function topNames(counts: Map<string, number>, nameOf: Map<string, string>): string[] {
+/**
+ * 한 부문의 수상자. 횟수가 가장 많은 한 명만 뽑는다.
+ * 횟수가 같으면 최종 점수가 높은 사람, 그것도 같으면 먼저 참가한 사람이다(`order`가 참가 순서).
+ */
+function topNames(
+  counts: Map<string, number>,
+  nameOf: Map<string, string>,
+  totalOf: (id: string) => number,
+  order: string[],
+): string[] {
   const max = Math.max(0, ...counts.values());
   if (max === 0) return [];
-  return [...counts.entries()]
-    .filter(([, n]) => n === max)
-    .map(([id]) => nameOf.get(id)!)
-    .sort((a, b) => a.localeCompare(b));
+  const [winner] = [...counts.entries()]
+    .filter(([id, n]) => n === max && nameOf.has(id))
+    .map(([id]) => id)
+    .sort((a, b) => totalOf(b) - totalOf(a) || order.indexOf(a) - order.indexOf(b));
+  return winner ? [nameOf.get(winner)!] : [];
 }
 
 /**
@@ -221,6 +237,13 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     .map((m) => ({ id: m.id, name: m.name, score: scoreMap.get(m.id)! }))
     .sort((a, b) => b.score.total - a.score.total || a.name.localeCompare(b.name));
 
+  const totalOf = (id: string) => scoreMap.get(id)?.total ?? 0;
+  const order = members.map((m) => m.id);
+  const top = (counts: Map<string, number>) => topNames(counts, nameOf, totalOf, order);
+
+  // 그림자 마니또: 메모 개수가 아니라 메모를 남긴 날(KST)의 수로 센다. 많이 적는다고 유리하지 않다.
+  const deedDays = new Set(deedRows.map((d) => `${d.giverId}|${kstDayKey(d.createdAt)}`));
+
   const tally = (ids: string[]) => {
     const m = new Map<string, number>();
     for (const id of ids) m.set(id, (m.get(id) ?? 0) + 1);
@@ -243,10 +266,10 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     scores,
     missions,
     awards: {
-      nunchi: topNames(tally(recordRows.filter((r) => r.isMine === true).map((r) => r.authorId)), nameOf),
-      heotdari: topNames(tally(recordRows.filter((r) => r.isMine === false).map((r) => r.authorId)), nameOf),
-      shadow: topNames(tally(deedRows.map((d) => d.giverId)), nameOf),
-      mission: topNames(tally(missionRows.map((r) => r.participantId)), nameOf),
+      nunchi: top(tally(recordRows.filter((r) => r.isMine === true).map((r) => r.authorId))),
+      heotdari: top(tally(recordRows.filter((r) => r.isMine === false).map((r) => r.authorId))),
+      shadow: top(tally([...deedDays].map((key) => key.split("|")[0]))),
+      mission: top(tally(missionRows.map((r) => r.participantId))),
     },
   };
 }
