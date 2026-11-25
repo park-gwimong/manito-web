@@ -19,7 +19,7 @@ function fixture(totals: number[]): RevealData {
       .sort((a, b) => b.total - a.total)
       .map((p) => ({ id: p.id, name: p.name, score: { ...zeroScore, total: p.total, lines: [] } })),
     missions: [],
-    awards: { nunchi: [], heotdari: [], shadow: [], mission: [] },
+    awards: { nunchi: [], heotdari: [], mission: [] },
   };
 }
 
@@ -58,6 +58,6 @@ describe("buildSlides", () => {
   });
 });
 
-test("시상 부문 이름은 스펙의 '그림자 마니또'를 쓴다", () => {
-  expect(AWARD_META.find((a) => a.key === "shadow")?.title).toBe("그림자 마니또");
+test("시상 부문은 눈치왕, 헛다리왕, 미션왕 세 가지다", () => {
+  expect(AWARD_META.map((a) => a.title)).toEqual(["눈치왕", "헛다리왕", "미션왕"]);
 });

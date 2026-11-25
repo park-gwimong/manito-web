@@ -36,7 +36,6 @@ export function buildSlides(data: RevealData): Slide[] {
 export const AWARD_META: { key: keyof RevealData["awards"]; title: string; desc: string }[] = [
   { key: "nunchi", title: "눈치왕", desc: "받은 마음을 가장 잘 알아챈 사람" },
   { key: "heotdari", title: "헛다리왕", desc: "엉뚱한 곳에서 마음을 찾은 사람" },
-  { key: "shadow", title: "그림자 마니또", desc: "가장 여러 날 몰래 챙긴 사람" },
   { key: "mission", title: "미션왕", desc: "미션을 가장 많이 해낸 사람" },
 ];
 

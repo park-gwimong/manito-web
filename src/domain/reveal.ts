@@ -11,10 +11,11 @@ import {
   secretDeeds,
   verdicts,
 } from "@/db/schema";
+import { decideAwards, type AwardStats } from "./awards";
 import { DomainError } from "./errors";
 import { advanceEvent } from "./lifecycle";
 import { enqueue } from "./notifications";
-import { finalScores, kstDayKey, temperature, type FinalScore } from "./scoring";
+import { finalScores, temperature, type FinalScore } from "./scoring";
 
 export type RevealData = {
   summary: { temperature: number; recordCount: number; missionsCompleted: number };
@@ -35,12 +36,10 @@ export type RevealData = {
    * 해낸 사람만 싣는다. 받고도 못 한 사람은 드러내지 않는다. 해낸 사람이 많은 순.
    */
   missions: { body: string; completedBy: string[] }[];
-  /** 부문마다 수상자는 한 명(해당자가 없으면 빈 배열). 그래서 수상자는 많아야 부문 수만큼이다. */
+  /** 부문마다 수상자는 한 명(해당자가 없으면 빈 배열). 동점을 가리는 순서는 `awards.ts`에 있다. */
   awards: {
     nunchi: string[];
     heotdari: string[];
-    /** 그림자 마니또: 몰래 한 일 메모를 남긴 날이 가장 많은 사람. 하루에 몰아 적어도 하루로 센다. */
-    shadow: string[];
     mission: string[];
   };
 };
@@ -132,25 +131,6 @@ export async function finishPresentation(db: Db, organizerId: string, now: Date)
 }
 
 /**
- * 한 부문의 수상자. 횟수가 가장 많은 한 명만 뽑는다.
- * 횟수가 같으면 최종 점수가 높은 사람, 그것도 같으면 먼저 참가한 사람이다(`order`가 참가 순서).
- */
-function topNames(
-  counts: Map<string, number>,
-  nameOf: Map<string, string>,
-  totalOf: (id: string) => number,
-  order: string[],
-): string[] {
-  const max = Math.max(0, ...counts.values());
-  if (max === 0) return [];
-  const [winner] = [...counts.entries()]
-    .filter(([id, n]) => n === max && nameOf.has(id))
-    .map(([id]) => id)
-    .sort((a, b) => totalOf(b) - totalOf(a) || order.indexOf(a) - order.indexOf(b));
-  return winner ? [nameOf.get(winner)!] : [];
-}
-
-/**
  * 최종 점수·배정·판정·몰래 한 일이 도메인 밖으로 나가는 유일한 경로.
  * 공개 조건을 만족하기 전에는 비밀 데이터를 조회하지 않는다.
  */
@@ -172,7 +152,7 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     .orderBy(asc(participants.createdAt), asc(participants.id));
   const nameOf = new Map(members.map((m) => [m.id, m.name]));
 
-  const [assignmentRows, recordRows, deedRows, guessRows, missionRows, templateRows, scoreMap, temp] = await Promise.all([
+  const [assignmentRows, recordRows, deedRows, guessRows, deliveryRows, templateRows, scoreMap, temp] = await Promise.all([
     db.select().from(assignments).where(eq(assignments.eventId, eventId)),
     db
       .select({
@@ -193,9 +173,13 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
       .orderBy(asc(secretDeeds.createdAt), asc(secretDeeds.id)),
     db.select().from(guesses),
     db
-      .select({ participantId: missionDeliveries.participantId, body: missionDeliveries.body })
+      .select({
+        participantId: missionDeliveries.participantId,
+        body: missionDeliveries.body,
+        completedAt: missionDeliveries.completedAt,
+      })
       .from(missionDeliveries)
-      .where(and(eq(missionDeliveries.eventId, eventId), isNotNull(missionDeliveries.completedAt))),
+      .where(eq(missionDeliveries.eventId, eventId)),
     db
       .select({ body: missionTemplates.body })
       .from(missionTemplates)
@@ -205,6 +189,7 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     temperature(db, event),
   ]);
 
+  const missionRows = deliveryRows.filter((d) => d.completedAt !== null);
   const giverOf = new Map(assignmentRows.map((a) => [a.receiverId, a.giverId]));
   const guessOf = new Map(guessRows.filter((g) => nameOf.has(g.participantId)).map((g) => [g.participantId, g.guessedId]));
 
@@ -237,18 +222,28 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     .map((m) => ({ id: m.id, name: m.name, score: scoreMap.get(m.id)! }))
     .sort((a, b) => b.score.total - a.score.total || a.name.localeCompare(b.name));
 
-  const totalOf = (id: string) => scoreMap.get(id)?.total ?? 0;
-  const order = members.map((m) => m.id);
-  const top = (counts: Map<string, number>) => topNames(counts, nameOf, totalOf, order);
-
-  // 그림자 마니또: 메모 개수가 아니라 메모를 남긴 날(KST)의 수로 센다. 많이 적는다고 유리하지 않다.
-  const deedDays = new Set(deedRows.map((d) => `${d.giverId}|${kstDayKey(d.createdAt)}`));
-
-  const tally = (ids: string[]) => {
-    const m = new Map<string, number>();
-    for (const id of ids) m.set(id, (m.get(id) ?? 0) + 1);
-    return m;
-  };
+  // 시상에 쓰는 사람별 집계. 참가한 순서대로 넘긴다.
+  const lastTime = (dates: Date[]) => (dates.length > 0 ? Math.max(...dates.map((d) => d.getTime())) : null);
+  const awardStats: AwardStats[] = members.map((m) => {
+    const mine = recordRows.filter((r) => r.authorId === m.id);
+    const hits = mine.filter((r) => r.isMine === true);
+    const misses = mine.filter((r) => r.isMine === false);
+    const delivered = deliveryRows.filter((d) => d.participantId === m.id);
+    const done = delivered.filter((d) => d.completedAt !== null);
+    return {
+      id: m.id,
+      hits: hits.length,
+      lastHitAt: lastTime(hits.map((r) => r.createdAt)),
+      misses: misses.length,
+      lastMissAt: lastTime(misses.map((r) => r.createdAt)),
+      guessedRight: guessOf.has(m.id) && guessOf.get(m.id) === giverOf.get(m.id),
+      missionsDelivered: delivered.length,
+      missionsDone: done.length,
+      lastMissionAt: lastTime(done.map((d) => d.completedAt!)),
+    };
+  });
+  const winners = decideAwards(awardStats);
+  const winnerName = (id: string | null) => (id ? [nameOf.get(id)!] : []);
 
   // 미션은 본문으로 묶는다(배달된 미션은 목록의 본문을 복사해 둔 것이다).
   const doneBy = new Map<string, string[]>();
@@ -266,10 +261,9 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
     scores,
     missions,
     awards: {
-      nunchi: top(tally(recordRows.filter((r) => r.isMine === true).map((r) => r.authorId))),
-      heotdari: top(tally(recordRows.filter((r) => r.isMine === false).map((r) => r.authorId))),
-      shadow: top(tally([...deedDays].map((key) => key.split("|")[0]))),
-      mission: top(tally(missionRows.map((r) => r.participantId))),
+      nunchi: winnerName(winners.nunchi),
+      heotdari: winnerName(winners.heotdari),
+      mission: winnerName(winners.mission),
     },
   };
 }

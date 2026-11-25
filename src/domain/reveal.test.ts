@@ -208,7 +208,7 @@ test("scores는 total 내림차순이고 summary가 채워진다", async () => {
   expect(summary.temperature).toBeGreaterThan(36.5);
 });
 
-test("awards: 부문마다 한 명, 동점이면 최종 점수가 높은 사람, 아무도 해당 없으면 빈 배열", async () => {
+test("awards: 부문마다 한 명, 아무도 해당 없으면 빈 배열", async () => {
   const { event, members } = await setup("active");
   // members[0], members[1]의 기록이 각각 '맞아요'로 판정된다(상은 기록 작성자 기준).
   const giver0 = (await getGiverIdOf(db, members[0].id))!;
@@ -227,17 +227,17 @@ test("awards: 부문마다 한 명, 동점이면 최종 점수가 높은 사람,
   await advanceEvent(db, event.id, closedAt);
   await startPresentation(db, members[0].id, closedAt);
 
-  const { awards, missions, scores } = await getRevealData(db, event.id, members[0].id);
+  const { awards, missions } = await getRevealData(db, event.id, members[0].id);
   // 미션 목록 전체가 공개되고, 해낸 사람만 이름이 붙는다.
   expect(missions).toHaveLength(DEFAULT_MISSIONS.length);
   expect(missions[0]).toEqual({ body: delivery.body, completedBy: [members[3].name] });
   expect(missions.slice(1).every((m) => m.completedBy.length === 0)).toBe(true);
-  // members[0]과 members[1]은 적중 수가 같다. 최종 점수가 높은 쪽, 그것도 같으면 먼저 참가한 members[0]이 받는다.
-  const total = (id: string) => scores.find((s) => s.id === id)!.score.total;
-  const expected = total(members[1].id) > total(members[0].id) ? members[1] : members[0];
-  expect(awards.nunchi).toEqual([expected.name]);
+  // members[0]과 members[1]은 적중 수, 적중률, 추측, 시각이 모두 같다. 끝까지 같으면 먼저 참가한 members[0]이 받는다.
+  // (동점을 가리는 순서는 awards.test.ts에서 따로 본다.)
+  expect(awards.nunchi).toEqual([members[0].name]);
   expect(awards.heotdari).toEqual([]);
-  expect(awards.shadow).toEqual([members[2].name]);
+  // 몰래 한 일 메모로 받는 상은 없다.
+  expect(Object.keys(awards).sort()).toEqual(["heotdari", "mission", "nunchi"]);
   expect(awards.mission).toEqual([members[3].name]);
 });
 
@@ -270,15 +270,10 @@ test("공개 순서는 점수와 무관하게 배정 고리를 따라간다", as
 
 test("몰래 한 일 메모 점수는 메모를 남긴 날마다 한 번만 받는다", async () => {
   const { event, members } = await setup("active");
-  // members[2]는 하루에 5개를 몰아 적고, members[3]은 이틀에 걸쳐 하나씩 적는다.
   for (let i = 0; i < 5; i++) await addSecretDeed(db, members[2].id, `메모${i}`, during);
-  await addSecretDeed(db, members[3].id, "첫날", during);
-  await addSecretDeed(db, members[3].id, "다음 날", new Date(during.getTime() + 86_400_000));
   await advanceEvent(db, event.id, closedAt);
   await startPresentation(db, members[0].id, closedAt);
-  const { scores, chain, awards } = await getRevealData(db, event.id, members[0].id);
-  // 그림자 마니또는 개수가 아니라 날짜 수로 뽑는다.
-  expect(awards.shadow).toEqual([members[3].name]);
+  const { scores, chain } = await getRevealData(db, event.id, members[0].id);
   const mine = scores.find((s) => s.id === members[2].id)!.score;
   expect(mine.secretDeed).toBe(5);
   expect(mine.lines).toContainEqual({ key: "secretDeed", count: 1, points: 5 });
