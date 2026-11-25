@@ -1,9 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState, useTransition, type FormEvent } from "react";
+import { scheduleProblems } from "@/lib/schedule-check";
+import type { MissionMode } from "@/domain/mission-plan";
 import type { ActionResult } from "@/lib/action";
-import { Button, Card, ErrorText, Field } from "../../../_components/ui";
+import { MissionPlanFields } from "../../../_components/MissionPlanFields";
+import { Button, Card, ErrorText, Field, ProblemList } from "../../../_components/ui";
 import { startPresentationAction, updateSettingsAction } from "../actions";
 
 type Props = {
@@ -12,6 +15,8 @@ type Props = {
   startsAtInput: string;
   endsAtInput: string;
   missionCount: number;
+  missionMode: MissionMode;
+  missionHour: number;
   templateCount: number;
 };
 
@@ -22,8 +27,26 @@ export function SettingsForm(props: Props) {
     null,
   );
 
+  const [problems, setProblems] = useState<string[]>([]);
+
+  function check(e: FormEvent<HTMLFormElement>) {
+    const data = new FormData(e.currentTarget);
+    const found = scheduleProblems(
+      {
+        startsAt: String(data.get("startsAt") ?? ""),
+        endsAt: String(data.get("endsAt") ?? ""),
+        missionCount: String(data.get("missionCount") ?? ""),
+        missionMode: String(data.get("missionMode") ?? ""),
+      },
+      props.templateCount,
+      new Date(),
+    );
+    setProblems(found);
+    if (found.length > 0) e.preventDefault();
+  }
+
   return (
-    <form action={formAction}>
+    <form action={formAction} onSubmit={check}>
       <Card className="flex flex-col gap-4">
         <h2 className="font-display text-xl">이벤트 정보</h2>
         <Field label="이벤트 이름" name="name" defaultValue={props.name} maxLength={40} required />
@@ -36,19 +59,15 @@ export function SettingsForm(props: Props) {
           hint="한국 시간 기준이에요."
           required
         />
-        <Field
-          label="미션 개수"
-          name="missionCount"
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={props.templateCount}
-          defaultValue={props.missionCount}
-          hint={`미션 목록에 ${props.templateCount}개가 있어요. 그 안에서 정해 주세요.`}
-          required
+        <MissionPlanFields
+          defaultMode={props.missionMode}
+          defaultHour={props.missionHour}
+          defaultCount={props.missionCount}
+          maxMissions={props.templateCount}
         />
-        <ErrorText>{state && !state.ok ? state.error : null}</ErrorText>
-        {state?.ok && (
+        <ProblemList problems={problems} />
+        <ErrorText>{problems.length === 0 && state && !state.ok ? state.error : null}</ErrorText>
+        {problems.length === 0 && state?.ok && (
           <p role="status" className="rounded-field bg-sun-tint px-4 py-3 text-sm font-medium">
             저장했어요.
           </p>
@@ -66,9 +85,12 @@ export function PresentationStart({
   code,
   started,
   unguessed,
+  resumeAt = 0,
 }: {
   code: string;
   started: boolean;
+  /** 발표 화면에서 나오기 전에 보던 장. 0이면 처음부터. */
+  resumeAt?: number;
   /** 아직 추측하지 않은 사람 수(이름은 받지 않는다). */
   unguessed: number;
 }) {
@@ -82,7 +104,7 @@ export function PresentationStart({
     setError(null);
     startTransition(async () => {
       const result: ActionResult = started ? { ok: true } : await startPresentationAction(code);
-      if (result.ok) router.push(`/e/${code}/present`);
+      if (result.ok) router.push(resumeAt > 0 ? `/e/${code}/present?s=${resumeAt}` : `/e/${code}/present`);
       else setError(result.error);
     });
   }
@@ -92,7 +114,9 @@ export function PresentationStart({
       <h2 className="font-display text-xl">결과 발표</h2>
       <p className="text-sm leading-relaxed text-ink-soft">
         {started
-          ? "발표가 시작됐어요. 큰 화면에 이어서 띄워 주세요."
+          ? resumeAt > 0
+            ? `발표가 시작됐어요. 다시 열면 보던 ${resumeAt + 1}번째 장부터 이어져요.`
+            : "발표가 시작됐어요. 큰 화면에 이어서 띄워 주세요."
           : "큰 화면(TV나 빔프로젝터)에 연결한 기기에서 시작해 주세요."}
       </p>
       {!started && (

@@ -10,14 +10,15 @@ import {
 import { BODY_MAX } from "./constants";
 import { DomainError } from "./errors";
 import { advanceEvent } from "./lifecycle";
+import { slotTimes, type MissionPlan } from "./mission-plan";
+import { enqueue } from "./notifications";
 
-/** 슬롯 시각: startsAt + slotIndex × (endsAt − startsAt) / missionCount. 0번 슬롯은 시작 시각. */
+/** 슬롯(몇 번째 미션)의 도착 시각. 규칙은 `mission-plan.ts`에 있다. 방식을 생략하면 custom으로 본다. */
 export function slotTime(
-  event: { startsAt: Date; endsAt: Date; missionCount: number },
+  event: Pick<MissionPlan, "startsAt" | "endsAt" | "missionCount"> & Partial<MissionPlan>,
   slotIndex: number,
 ): Date {
-  const span = event.endsAt.getTime() - event.startsAt.getTime();
-  return new Date(event.startsAt.getTime() + Math.floor((slotIndex * span) / event.missionCount));
+  return slotTimes({ missionMode: "custom", missionHour: 9, ...event })[slotIndex];
 }
 
 /** 시각이 지난 슬롯 중 아직 배달되지 않은 것을 참가자마다 넣는다. 여러 번 불러도 슬롯당 한 건. */
@@ -27,10 +28,8 @@ export async function deliverDueMissions(
   now: Date,
   rng: () => number,
 ): Promise<void> {
-  const dueSlots: number[] = [];
-  for (let i = 0; i < event.missionCount; i++) {
-    if (slotTime(event, i).getTime() <= now.getTime()) dueSlots.push(i);
-  }
+  const times = slotTimes(event);
+  const dueSlots = times.map((_, i) => i).filter((i) => times[i].getTime() <= now.getTime());
   if (dueSlots.length === 0) return;
 
   await db.transaction(async (tx) => {
@@ -70,11 +69,24 @@ export async function deliverDueMissions(
           participantId: member.id,
           body,
           slotIndex,
-          deliveredAt: slotTime(event, slotIndex),
+          deliveredAt: times[slotIndex],
         });
       }
     }
-    if (rows.length > 0) await tx.insert(missionDeliveries).values(rows).onConflictDoNothing();
+    if (rows.length === 0) return;
+    const inserted = await tx
+      .insert(missionDeliveries)
+      .values(rows)
+      .onConflictDoNothing()
+      .returning({ participantId: missionDeliveries.participantId, slotIndex: missionDeliveries.slotIndex });
+    // 첫 미션은 시작 알림과 겹치고, 종료 뒤에 몰아서 배달된 미션은 할 수 없으니 알리지 않는다.
+    if (now.getTime() >= event.endsAt.getTime()) return;
+    await enqueue(
+      tx,
+      event.id,
+      inserted.filter((r) => r.slotIndex > 0).map((r) => r.participantId),
+      "mission",
+    );
   });
 }
 
@@ -195,7 +207,12 @@ export async function deleteTemplate(
       .from(missionTemplates)
       .where(eq(missionTemplates.eventId, event.id));
     if (!all.some((t) => t.id === templateId)) throw templateNotFound();
-    if (all.length - 1 < event.missionCount) {
+    if (event.missionMode !== "custom") {
+      // 개수가 일정으로 정해지는 방식에서는 목록이 비지만 않으면 된다.
+      if (all.length - 1 < 1) {
+        throw new DomainError("TOO_FEW_TEMPLATES", "미션은 하나 이상 남겨 두어야 해요.");
+      }
+    } else if (all.length - 1 < event.missionCount) {
       throw new DomainError(
         "TOO_FEW_TEMPLATES",
         `미션이 ${event.missionCount}개보다 적어져요. 미션 개수를 먼저 줄여 주세요.`,

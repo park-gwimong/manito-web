@@ -43,7 +43,7 @@ export function LoginForm({ code, candidates }: { code: string; candidates: Logi
           {candidates.map((c) => (
             <label
               key={c.id}
-              className="flex min-h-11 cursor-pointer items-center rounded-pill border-2 border-line bg-card px-4 font-medium has-checked:border-berry has-checked:bg-berry has-checked:text-white has-focus-visible:outline-3 has-focus-visible:outline-sun"
+              className="flex min-h-11 cursor-pointer items-center rounded-pill border border-line bg-card px-4 font-medium has-checked:border-berry has-checked:bg-berry has-checked:text-white has-focus-visible:outline-3 has-focus-visible:outline-sun"
             >
               <input
                 type="radio"
@@ -93,8 +93,8 @@ function OrganizerPinReset({ code }: { code: string }) {
   );
 
   return (
-    <details className="group rounded-field border-2 border-dashed border-line px-4 py-3">
-      <summary className="cursor-pointer list-none text-sm font-semibold text-ink-soft">
+    <details className="group rounded-field border border-dashed border-line px-4 py-1">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-ink-soft">
         개설자 PIN을 잊었어요
       </summary>
       <form action={formAction} className="flex flex-col gap-3 pt-3">

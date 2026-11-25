@@ -43,3 +43,6 @@ next-env.d.ts
 
 # controller scratch
 .superpowers/
+
+# 개발 서버의 내장 DB
+/.local/

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { DomainError } from "@/domain/errors";
 import { createEvent } from "@/domain/events";
+import { DEFAULT_MISSION_HOUR, type MissionMode } from "@/domain/mission-plan";
 import { verifyAdminPassword } from "@/domain/participants";
 import { runAction, str, type ActionResult } from "@/lib/action";
 import { parseKstInput } from "@/lib/format";
@@ -31,6 +32,9 @@ export async function createEventAction(formData: FormData): Promise<ActionResul
         startsAt: requireDate(str(formData.get("startsAt")), "시작 일시"),
         endsAt: requireDate(str(formData.get("endsAt")), "종료 일시"),
         missionCount: missionRaw === "" ? Number.NaN : Number(missionRaw),
+        missionMode: str(formData.get("missionMode")) as MissionMode,
+        // custom에서는 도착 시각 칸이 없으므로 기본값을 쓴다.
+        missionHour: formData.get("missionHour") === null ? DEFAULT_MISSION_HOUR : Number(str(formData.get("missionHour"))),
         organizerName: str(formData.get("organizerName")),
         organizerPin: str(formData.get("organizerPin")),
       },

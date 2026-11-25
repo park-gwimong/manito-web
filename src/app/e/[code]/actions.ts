@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getDb } from "@/db/client";
 import { updateEventSettings } from "@/domain/events";
 import { addTemplate, completeMission, deleteTemplate, updateTemplate } from "@/domain/missions";
@@ -23,7 +24,11 @@ import {
   updateRecord,
 } from "@/domain/records";
 import { finishPresentation, setGuess, startPresentation } from "@/domain/reveal";
+import { changeEndsAt, closeNow, startNow } from "@/domain/lifecycle";
+import { removeSubscription, saveSubscription } from "@/domain/notifications";
+import { flushNotifications } from "@/lib/push";
 import { DomainError } from "@/domain/errors";
+import { DEFAULT_MISSION_HOUR, type MissionMode } from "@/domain/mission-plan";
 import { runAction, str, type ActionResult } from "@/lib/action";
 import { parseKstInput } from "@/lib/format";
 import { requireEvent, requireMe, requireMember, setSession } from "@/lib/viewer";
@@ -31,7 +36,11 @@ import { requireEvent, requireMe, requireMember, setSession } from "@/lib/viewer
 /** 성공했을 때만 이벤트 화면 전체를 다시 그린다. */
 async function act(fn: () => Promise<void>): Promise<ActionResult> {
   const result = await runAction(fn);
-  if (result.ok) revalidatePath("/e/[code]", "layout");
+  if (result.ok) {
+    revalidatePath("/e/[code]", "layout");
+    // 방금 한 일로 생긴 알림(새 기록, 시작, 마감 등)을 응답을 보낸 뒤에 내보낸다.
+    after(() => flushNotifications(getDb()).catch((e) => console.error("[push] 전송 실패", e)));
+  }
   return result;
 }
 
@@ -148,6 +157,9 @@ export async function updateSettingsAction(code: string, formData: FormData): Pr
         startsAt: requireDate(str(formData.get("startsAt")), "시작 일시"),
         endsAt: requireDate(str(formData.get("endsAt")), "종료 일시"),
         missionCount: missionRaw === "" ? Number.NaN : Number(missionRaw),
+        missionMode: str(formData.get("missionMode")) as MissionMode,
+        // custom에서는 도착 시각 칸이 없으므로 기본값을 쓴다.
+        missionHour: formData.get("missionHour") === null ? DEFAULT_MISSION_HOUR : Number(str(formData.get("missionHour"))),
       },
       new Date(),
     );
@@ -178,7 +190,7 @@ export async function deleteTemplateAction(code: string, templateId: string): Pr
 export async function removeParticipantAction(code: string, targetId: string): Promise<ActionResult> {
   return act(async () => {
     const { me } = await requireMe(str(code));
-    await removeParticipant(getDb(), me.id, str(targetId));
+    await removeParticipant(getDb(), me.id, str(targetId), new Date());
   });
 }
 
@@ -194,6 +206,49 @@ export async function resetOrganizerPinAction(code: string, adminPassword: strin
   return act(async () => {
     const event = await requireEvent(str(code));
     await resetOrganizerPin(getDb(), event.id, str(adminPassword), new Date());
+  });
+}
+
+export async function startNowAction(code: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await startNow(getDb(), me.id, new Date());
+  });
+}
+
+export async function changeEndsAtAction(code: string, endsAt: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await changeEndsAt(getDb(), me.id, requireDate(str(endsAt), "종료 일시"), new Date());
+  });
+}
+
+export async function closeNowAction(code: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await closeNow(getDb(), me.id, new Date());
+  });
+}
+
+// ---- 알림 ----
+
+type SubscriptionInput = { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+
+export async function savePushSubscriptionAction(code: string, sub: SubscriptionInput): Promise<ActionResult> {
+  return runAction(async () => {
+    const { me } = await requireMe(str(code));
+    await saveSubscription(getDb(), me.id, {
+      endpoint: str(sub?.endpoint),
+      p256dh: str(sub?.keys?.p256dh),
+      auth: str(sub?.keys?.auth),
+    });
+  });
+}
+
+export async function removePushSubscriptionAction(code: string, endpoint: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const { me } = await requireMe(str(code));
+    await removeSubscription(getDb(), me.id, str(endpoint));
   });
 }
 

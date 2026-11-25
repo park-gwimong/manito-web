@@ -4,6 +4,13 @@ import type { Db } from "@/db/client";
 import { events, missionTemplates, participants, type Event, type Participant } from "@/db/schema";
 import { DEFAULT_MISSIONS } from "./default-missions";
 import { DomainError } from "./errors";
+import {
+  isMissionHour,
+  isMissionMode,
+  plannedMissionCount,
+  DEFAULT_MISSION_HOUR,
+  type MissionMode,
+} from "./mission-plan";
 import { assertValidPin, hashPin, normalizeName } from "./participants";
 
 // 헷갈리기 쉬운 문자(0/O, 1/I/L)를 뺀 코드 알파벳
@@ -16,20 +23,44 @@ function generateCode(): string {
   return code;
 }
 
+/** 일정과 미션 방식 입력. 방식을 생략하면 개수를 직접 정하는 custom이다. */
+export type ScheduleInput = {
+  startsAt: Date;
+  endsAt: Date;
+  missionCount: number;
+  missionMode?: MissionMode;
+  missionHour?: number;
+};
+
+/** 검증하고, 저장할 미션 설정을 돌려준다. 매일·이틀 방식의 개수는 일정에서 계산한다. */
 export function validateSchedule(
-  input: { startsAt: Date; endsAt: Date; missionCount: number },
+  input: ScheduleInput,
   templateCount: number,
   now: Date,
-): void {
+): { missionMode: MissionMode; missionHour: number; missionCount: number } {
   if (input.startsAt.getTime() <= now.getTime()) {
     throw new DomainError("START_IN_PAST", "시작 시각은 지금보다 뒤여야 해요.");
   }
   if (input.endsAt.getTime() <= input.startsAt.getTime()) {
     throw new DomainError("END_BEFORE_START", "종료 시각은 시작 시각보다 뒤여야 해요.");
   }
+  const missionMode = input.missionMode ?? "custom";
+  const missionHour = input.missionHour ?? DEFAULT_MISSION_HOUR;
+  if (!isMissionMode(missionMode)) {
+    throw new DomainError("BAD_MISSION_MODE", "미션을 보내는 방식을 골라 주세요.");
+  }
+  if (!isMissionHour(missionHour)) {
+    throw new DomainError("BAD_MISSION_HOUR", "미션 도착 시각을 골라 주세요.");
+  }
+  if (missionMode !== "custom") {
+    // 개수는 일정이 정한다. 미션 목록보다 길어지면 받았던 미션이 다시 올 뿐이라 막지 않는다.
+    const missionCount = plannedMissionCount({ ...input, missionMode, missionHour, missionCount: 0 });
+    return { missionMode, missionHour, missionCount };
+  }
   if (!Number.isInteger(input.missionCount) || input.missionCount < 0 || input.missionCount > templateCount) {
     throw new DomainError("BAD_MISSION_COUNT", `미션 개수는 0개 이상 ${templateCount}개 이하로 정해 주세요.`);
   }
+  return { missionMode, missionHour, missionCount: input.missionCount };
 }
 
 export async function createEvent(
@@ -39,6 +70,8 @@ export async function createEvent(
     startsAt: Date;
     endsAt: Date;
     missionCount: number;
+    missionMode?: MissionMode;
+    missionHour?: number;
     organizerName: string;
     organizerPin: string;
   },
@@ -48,7 +81,7 @@ export async function createEvent(
   if (!name) throw new DomainError("INVALID_EVENT_NAME", "이벤트 이름을 입력해 주세요.");
   const organizerName = normalizeName(input.organizerName);
   assertValidPin(input.organizerPin);
-  validateSchedule(input, DEFAULT_MISSIONS.length, now);
+  const mission = validateSchedule(input, DEFAULT_MISSIONS.length, now);
   const pinHash = await hashPin(input.organizerPin);
 
   return db.transaction(async (tx) => {
@@ -59,7 +92,7 @@ export async function createEvent(
         name,
         startsAt: input.startsAt,
         endsAt: input.endsAt,
-        missionCount: input.missionCount,
+        ...mission,
       })
       .returning();
     await tx
@@ -81,7 +114,7 @@ export async function getEventByCode(db: Db, code: string): Promise<Event | null
 export async function updateEventSettings(
   db: Db,
   organizerId: string,
-  input: { name: string; startsAt: Date; endsAt: Date; missionCount: number },
+  input: ScheduleInput & { name: string },
   now: Date,
 ): Promise<Event> {
   const [organizer] = await db.select().from(participants).where(eq(participants.id, organizerId));
@@ -101,14 +134,14 @@ export async function updateEventSettings(
       .select({ id: missionTemplates.id })
       .from(missionTemplates)
       .where(eq(missionTemplates.eventId, event.id));
-    validateSchedule(input, templates.length, now);
+    const mission = validateSchedule(input, templates.length, now);
     const [updated] = await tx
       .update(events)
       .set({
         name,
         startsAt: input.startsAt,
         endsAt: input.endsAt,
-        missionCount: input.missionCount,
+        ...mission,
         startMissedAt: null,
       })
       .where(eq(events.id, event.id))

@@ -17,7 +17,8 @@ function fixture(totals: number[]): RevealData {
     })),
     scores: [...people]
       .sort((a, b) => b.total - a.total)
-      .map((p) => ({ id: p.id, name: p.name, score: { ...zeroScore, total: p.total } })),
+      .map((p) => ({ id: p.id, name: p.name, score: { ...zeroScore, total: p.total, lines: [] } })),
+    missions: [],
     awards: { nunchi: [], heotdari: [], shadow: [], mission: [] },
   };
 }

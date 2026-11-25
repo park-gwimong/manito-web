@@ -286,7 +286,7 @@ test("개설자가 아닌 사람의 resetPin·removeParticipant는 NOT_ORGANIZER
   expect(await codeOf(() => removeParticipant(db, a.id, b.id))).toBe("NOT_ORGANIZER");
 });
 
-test("개설자는 참가자를 내보낼 수 있지만 자신은 못 내보내고, 시작 뒤에는 불가", async () => {
+test("개설자는 참가자를 내보낼 수 있지만 자신은 못 내보내고, 마감 뒤에는 불가", async () => {
   const a = await joinEvent(db, event.id, { name: "지민", pin: "1234" }, now);
   expect(await codeOf(() => removeParticipant(db, organizer.id, organizer.id))).toBe(
     "CANNOT_REMOVE_ORGANIZER",
@@ -294,8 +294,8 @@ test("개설자는 참가자를 내보낼 수 있지만 자신은 못 내보내�
   await removeParticipant(db, organizer.id, a.id);
   expect(await get(a.id)).toBeUndefined();
   const b = await joinEvent(db, event.id, { name: "민수", pin: "1234" }, now);
-  await db.update(events).set({ status: "active" }).where(eq(events.id, event.id));
-  expect(await codeOf(() => removeParticipant(db, organizer.id, b.id))).toBe("NOT_PREPARING");
+  await db.update(events).set({ status: "closed" }).where(eq(events.id, event.id));
+  expect(await codeOf(() => removeParticipant(db, organizer.id, b.id))).toBe("NOT_REMOVABLE");
 });
 
 test("관리 비밀번호가 틀리면 resetOrganizerPin은 WRONG_ADMIN_PASSWORD", async () => {

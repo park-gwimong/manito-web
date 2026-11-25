@@ -34,7 +34,7 @@ export function ReactionBar({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         {emojis.map((emoji) => {
           const r = byEmoji.get(emoji);
           const mine = r?.mine ?? false;
@@ -45,8 +45,13 @@ export function ReactionBar({
               disabled={readOnly || pending}
               aria-pressed={mine}
               onClick={() => toggle(emoji)}
-              className={`flex min-h-10 min-w-12 items-center justify-center gap-1 rounded-pill border-2 px-3 text-base transition disabled:opacity-70 ${
-                mine ? "border-sun bg-sun-tint" : "border-line bg-card"
+              aria-label={`${emoji} 반응${r ? ` ${r.count}개` : ""}`}
+              className={`flex min-h-11 items-center justify-center gap-1 rounded-pill text-base transition disabled:cursor-default ${
+                mine
+                  ? "border border-sun bg-sun-tint px-3"
+                  : r
+                    ? "border border-line bg-card px-3"
+                    : "min-w-11 px-1 opacity-45 grayscale hover:bg-paper hover:opacity-100 hover:grayscale-0"
               }`}
             >
               <span aria-hidden="true">{emoji}</span>

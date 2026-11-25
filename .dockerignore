@@ -9,6 +9,9 @@ docs
 Dockerfile
 docker-compose*.yml
 *.md
+# 앱의 도움말 화면(/guide)이 빌드할 때 읽는 문서
+!docs/USER_GUIDE.md
 tsconfig.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
+.local

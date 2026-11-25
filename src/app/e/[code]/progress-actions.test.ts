@@ -29,6 +29,10 @@ vi.mock("@/domain/participants", () => ({
   setNewPin: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/server", () => ({ after: vi.fn() }));
+vi.mock("@/lib/push", () => ({ flushNotifications: vi.fn() }));
+vi.mock("@/domain/lifecycle", () => ({ changeEndsAt: vi.fn(), closeNow: vi.fn(), startNow: vi.fn() }));
+vi.mock("@/domain/notifications", () => ({ removeSubscription: vi.fn(), saveSubscription: vi.fn() }));
 vi.mock("next/navigation", () => ({ unstable_rethrow: vi.fn() }));
 
 import {

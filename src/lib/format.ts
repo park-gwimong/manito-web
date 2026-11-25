@@ -21,6 +21,30 @@ export function formatKst(d: Date): string {
   return `${p.month}월 ${p.day}일 ${pad(p.hour)}:${pad(p.minute)}`;
 }
 
+/** `14:20` */
+export function formatKstTime(d: Date): string {
+  const p = kstParts(d);
+  return `${pad(p.hour)}:${pad(p.minute)}`;
+}
+
+/** 같은 KST 날짜끼리 묶기 위한 키. `2026-12-03` */
+export function kstDayKey(d: Date): string {
+  const p = kstParts(d);
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** 피드 날짜 구분선. `오늘`, `어제`, 그 밖에는 `12월 3일 수요일` */
+export function formatKstDay(d: Date, now: Date): string {
+  const key = kstDayKey(d);
+  if (key === kstDayKey(now)) return "오늘";
+  if (key === kstDayKey(new Date(now.getTime() - 24 * 60 * 60 * 1000))) return "어제";
+  const p = kstParts(d);
+  const weekday = WEEKDAYS[new Date(d.getTime() + KST_OFFSET_MS).getUTCDay()];
+  return `${p.month}월 ${p.day}일 ${weekday}요일`;
+}
+
 /** `52.5℃` */
 export function formatTemp(t: number): string {
   return `${t.toFixed(1)}℃`;

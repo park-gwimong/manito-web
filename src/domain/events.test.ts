@@ -27,11 +27,11 @@ async function codeOf(fn: () => unknown) {
 }
 
 test("기본 미션은 정확히 30개", () => {
-  expect(DEFAULT_MISSIONS).toHaveLength(30);
-  expect(new Set(DEFAULT_MISSIONS).size).toBe(30);
+  expect(DEFAULT_MISSIONS).toHaveLength(60);
+  expect(new Set(DEFAULT_MISSIONS).size).toBe(60);
 });
 
-test("개설하면 준비 상태, 개설자 1명, 미션 목록 30개", async () => {
+test("개설하면 준비 상태, 개설자 1명, 미션 목록 60개", async () => {
   const { event, organizer } = await createEvent(db, base, now);
   expect(event.status).toBe("preparing");
   expect(event.code).toMatch(/^[A-Z0-9]{8}$/);
@@ -40,7 +40,7 @@ test("개설하면 준비 상태, 개설자 1명, 미션 목록 30개", async ()
   const ps = await db.select().from(participants).where(eq(participants.eventId, event.id));
   expect(ps).toHaveLength(1);
   const ms = await db.select().from(missionTemplates).where(eq(missionTemplates.eventId, event.id));
-  expect(ms).toHaveLength(30);
+  expect(ms).toHaveLength(60);
   expect((await getEventByCode(db, event.code))?.id).toBe(event.id);
   expect(await getEventByCode(db, "NOPE0000")).toBeNull();
 });

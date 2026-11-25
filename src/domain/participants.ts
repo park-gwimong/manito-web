@@ -1,10 +1,17 @@
 import bcrypt from "bcryptjs";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { events, participants, type Participant } from "@/db/schema";
-import { NAME_MAX, PIN_LOCK_MAX_MINUTES, PIN_LOCK_MINUTES, PIN_MAX_FAILS } from "./constants";
+import { assignments, events, participants, records, secretDeeds, verdicts, type Participant } from "@/db/schema";
+import {
+  MIN_ACTIVE_PARTICIPANTS,
+  NAME_MAX,
+  PIN_LOCK_MAX_MINUTES,
+  PIN_LOCK_MINUTES,
+  PIN_MAX_FAILS,
+} from "./constants";
 import { DomainError } from "./errors";
+import { enqueue } from "./notifications";
 
 const BCRYPT_COST = process.env.NODE_ENV === "test" ? 4 : 10;
 
@@ -248,7 +255,17 @@ export async function getPinResetTrace(db: Db, participantId: string): Promise<{
   return row?.lastPinResetAt ? { resetAt: row.lastPinResetAt } : null;
 }
 
-export async function removeParticipant(db: Db, organizerId: string, targetId: string): Promise<void> {
+/**
+ * 개설자가 참가자를 내보낸다.
+ * - 준비 중: 명단에서 지운다.
+ * - 진행 중: 그 사람을 챙기던 마니또가, 그 사람이 챙기던 대상을 이어받는다. 고리는 하나로 유지된다.
+ */
+export async function removeParticipant(
+  db: Db,
+  organizerId: string,
+  targetId: string,
+  now: Date = new Date(),
+): Promise<void> {
   const organizer = await requireOrganizer(db, organizerId);
   if (targetId === organizerId) {
     throw new DomainError("CANNOT_REMOVE_ORGANIZER", "개설자는 내보낼 수 없어요.");
@@ -257,12 +274,54 @@ export async function removeParticipant(db: Db, organizerId: string, targetId: s
   if (target.eventId !== organizer.eventId) {
     throw new DomainError("PARTICIPANT_NOT_FOUND", "참가자를 찾을 수 없어요.");
   }
-  // 이벤트 행을 잠근 채 상태를 다시 확인해, 시작 처리 도중 삭제가 끼어들지 못하게 한다.
+  // 이벤트 행을 잠근 채 상태를 다시 확인해, 시작 처리나 미션 배달 도중 삭제가 끼어들지 못하게 한다.
   await db.transaction(async (tx) => {
-    const [event] = await tx.select().from(events).where(eq(events.id, organizer.eventId)).for("share");
-    if (event.status !== "preparing") {
-      throw new DomainError("NOT_PREPARING", "이벤트가 시작된 뒤에는 참가자를 내보낼 수 없어요.");
+    const [event] = await tx.select().from(events).where(eq(events.id, organizer.eventId)).for("update");
+    if (event.status === "preparing") {
+      await tx.delete(participants).where(eq(participants.id, targetId));
+      return;
     }
+    if (event.status !== "active") {
+      throw new DomainError("NOT_REMOVABLE", "마감된 뒤에는 참가자를 내보낼 수 없어요.");
+    }
+
+    // 진행 중: 고리에서 한 사람을 빼고 앞뒤를 잇는다. (마니또 → 나가는 사람 → 대상) ⇒ (마니또 → 대상)
+    const members = await tx
+      .select({ id: participants.id })
+      .from(participants)
+      .where(eq(participants.eventId, event.id));
+    if (members.length - 1 < MIN_ACTIVE_PARTICIPANTS) {
+      throw new DomainError(
+        "TOO_FEW_PARTICIPANTS",
+        `진행 중에는 ${MIN_ACTIVE_PARTICIPANTS}명 아래로 줄일 수 없어요. 그만하려면 지금 마감해 주세요.`,
+      );
+    }
+    const [incoming] = await tx.select().from(assignments).where(eq(assignments.receiverId, targetId));
+    const [outgoing] = await tx.select().from(assignments).where(eq(assignments.giverId, targetId));
+    // 나가는 사람과 그 사람이 쓴 기록·반응·미션, 앞뒤 배정이 함께 지워진다(ON DELETE CASCADE).
     await tx.delete(participants).where(eq(participants.id, targetId));
+    if (!incoming || !outgoing) return;
+    // 마니또가 나간 사람을 두고 적어 둔 몰래 한 일 메모는 새 대상의 것이 아니므로 지운다.
+    await tx.delete(secretDeeds).where(eq(secretDeeds.giverId, incoming.giverId));
+    // 새 대상의 기록에 달린 답은 나간 사람이 한 것이다. 지워서 새 마니또가 처음부터 답하게 한다.
+    const inherited = await tx
+      .select({ id: records.id })
+      .from(records)
+      .where(eq(records.authorId, outgoing.receiverId));
+    if (inherited.length > 0) {
+      await tx.delete(verdicts).where(
+        inArray(
+          verdicts.recordId,
+          inherited.map((r) => r.id),
+        ),
+      );
+    }
+    await tx.insert(assignments).values({
+      eventId: event.id,
+      giverId: incoming.giverId,
+      receiverId: outgoing.receiverId,
+      reassignedAt: now,
+    });
+    await enqueue(tx, event.id, [incoming.giverId], "reassigned");
   });
 }

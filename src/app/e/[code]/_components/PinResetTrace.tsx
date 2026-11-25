@@ -4,7 +4,7 @@
  */
 export function PinResetTrace({ resetAtLabel }: { resetAtLabel: string }) {
   return (
-    <p className="rounded-field border-2 border-dashed border-line px-4 py-3 text-xs leading-relaxed text-ink-soft">
+    <p className="rounded-field border border-dashed border-line px-4 py-3 text-xs leading-relaxed text-ink-soft">
       이 계정의 PIN은 {resetAtLabel}에 개설자가 초기화했어요. 본인이 요청한 게 아니라면 모임에 알려 주세요.
     </p>
   );

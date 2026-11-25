@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import {
+  assignments,
   events,
   missionDeliveries,
   participants,
@@ -12,7 +13,7 @@ import {
 } from "@/db/schema";
 import { MIN_PARTICIPANTS } from "./constants";
 import { getTargetOf } from "./lifecycle";
-import { kstDayKey, livePoints, temperature } from "./scoring";
+import { kstDayKey, liveLines, temperature, type ScoreLine } from "./scoring";
 
 export type FeedItem = {
   id: string;
@@ -34,13 +35,16 @@ export type Lobby = {
 
 export type Duty = {
   target: { id: string; name: string };
+  /** 진행 중에 참가자가 빠져 대상이 바뀌었는지. */
+  reassigned: boolean;
   missions: { id: string; body: string; deliveredAt: Date; completed: boolean }[];
   targetRecords: FeedItem[];
   secretDeeds: { id: string; body: string; createdAt: Date }[];
 };
 
 export type Ranking = {
-  entries: { id: string; name: string; points: number; isMe: boolean }[];
+  /** `lines`는 점수 내역(기록, 미션). 누구에게나 보여도 되는 정보만 들어 있다. */
+  entries: { id: string; name: string; points: number; lines: ScoreLine[]; isMe: boolean }[];
   stats: { recordCount: number; missionsDelivered: number; missionsCompleted: number };
 };
 
@@ -128,10 +132,41 @@ async function buildFeed(
   });
 }
 
+/**
+ * 모두가 보는 홈 피드. 판정 질문(judge)은 넣지 않는다:
+ * 홈 화면은 옆 사람 눈에 띄기 쉬워, 어느 글에 질문이 붙었는지로 내 대상이 드러날 수 있다.
+ * 판정은 `getDuty`(내 임무)에서만 한다.
+ */
 export async function getFeed(db: Db, eventId: string, viewerId: string): Promise<FeedItem[]> {
   const event = await loadEvent(db, eventId);
+  return buildFeed(db, event, viewerId, null);
+}
+
+/**
+ * `내 임무` 메뉴에 붙이는 숫자: 아직 완료하지 않은 미션 + 아직 답하지 않은 대상의 기록.
+ * 숫자만 돌려주므로 화면에 보여도 대상이 누구인지는 드러나지 않는다.
+ */
+export async function getDutyBadge(db: Db, eventId: string, viewerId: string): Promise<number> {
   const target = await getTargetOf(db, viewerId);
-  return buildFeed(db, event, viewerId, target?.id ?? null);
+  if (!target) return 0;
+  const [missionRows, recordRows] = await Promise.all([
+    db
+      .select({ id: missionDeliveries.id })
+      .from(missionDeliveries)
+      .where(
+        and(
+          eq(missionDeliveries.eventId, eventId),
+          eq(missionDeliveries.participantId, viewerId),
+          isNull(missionDeliveries.completedAt),
+        ),
+      ),
+    db
+      .select({ id: records.id, verdict: verdicts.recordId })
+      .from(records)
+      .leftJoin(verdicts, eq(verdicts.recordId, records.id))
+      .where(and(eq(records.eventId, eventId), eq(records.authorId, target.id))),
+  ]);
+  return missionRows.length + recordRows.filter((r) => r.verdict === null).length;
 }
 
 export async function getDuty(db: Db, eventId: string, viewerId: string): Promise<Duty | null> {
@@ -139,7 +174,7 @@ export async function getDuty(db: Db, eventId: string, viewerId: string): Promis
   if (!target) return null;
   const event = await loadEvent(db, eventId);
 
-  const [missionRows, deedRows, targetRecords] = await Promise.all([
+  const [missionRows, deedRows, targetRecords, reassignedRows] = await Promise.all([
     db
       .select()
       .from(missionDeliveries)
@@ -151,10 +186,12 @@ export async function getDuty(db: Db, eventId: string, viewerId: string): Promis
       .where(and(eq(secretDeeds.eventId, eventId), eq(secretDeeds.giverId, viewerId)))
       .orderBy(desc(secretDeeds.createdAt), desc(secretDeeds.id)),
     buildFeed(db, event, viewerId, target.id, target.id),
+    db.select({ reassignedAt: assignments.reassignedAt }).from(assignments).where(eq(assignments.giverId, viewerId)),
   ]);
 
   return {
     target: { id: target.id, name: target.name },
+    reassigned: reassignedRows.some((a) => a.reassignedAt !== null),
     missions: missionRows.map((m) => ({
       id: m.id,
       body: m.body,
@@ -167,8 +204,8 @@ export async function getDuty(db: Db, eventId: string, viewerId: string): Promis
 }
 
 export async function getRanking(db: Db, eventId: string, viewerId: string): Promise<Ranking> {
-  const [points, members, recordRows, deliveryRows] = await Promise.all([
-    livePoints(db, eventId),
+  const [lines, members, recordRows, deliveryRows] = await Promise.all([
+    liveLines(db, eventId),
     db.select({ id: participants.id, name: participants.name }).from(participants).where(eq(participants.eventId, eventId)),
     db.select({ id: records.id }).from(records).where(eq(records.eventId, eventId)),
     db
@@ -177,7 +214,10 @@ export async function getRanking(db: Db, eventId: string, viewerId: string): Pro
       .where(eq(missionDeliveries.eventId, eventId)),
   ]);
   const entries = members
-    .map((m) => ({ id: m.id, name: m.name, points: points.get(m.id) ?? 0, isMe: m.id === viewerId }))
+    .map((m) => {
+      const mine = lines.get(m.id) ?? [];
+      return { id: m.id, name: m.name, points: mine.reduce((sum, l) => sum + l.points, 0), lines: mine, isMe: m.id === viewerId };
+    })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
   return {
     entries,

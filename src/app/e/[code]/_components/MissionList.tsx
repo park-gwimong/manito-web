@@ -33,7 +33,7 @@ export function MissionList({
     <div className="flex flex-col gap-2">
       <ul className="flex flex-col gap-2">
         {missions.map((m) => (
-          <li key={m.id} className="flex items-start gap-3 rounded-field bg-paper px-4 py-3">
+          <li key={m.id} className={`flex items-start gap-3 rounded-field border px-4 py-3 ${m.completed ? "border-transparent bg-paper" : "border-line bg-card shadow-lift"}`}>
             <input
               type="checkbox"
               id={`mission-${m.id}`}
@@ -44,7 +44,9 @@ export function MissionList({
             />
             <label htmlFor={`mission-${m.id}`} className="flex flex-col gap-0.5">
               <span className={`text-base ${m.completed ? "text-ink-soft line-through" : "text-ink"}`}>{m.body}</span>
-              <span className="text-xs text-ink-soft">{formatKst(m.deliveredAt)} 도착</span>
+              <span className="text-xs text-ink-soft">
+                {formatKst(m.deliveredAt)} 도착{m.completed && " · 완료했어요"}
+              </span>
             </label>
           </li>
         ))}

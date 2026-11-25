@@ -42,7 +42,7 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 rows={2}
-                className="rounded-field border-2 border-line bg-card px-4 py-3 focus:border-berry focus:outline-none"
+                className="rounded-field border border-line bg-card px-4 py-3 focus:border-berry focus:ring-4 focus:ring-berry/15 focus:outline-none"
               />
               <div className="flex gap-2">
                 <Button
@@ -60,10 +60,10 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
           ) : (
             <li key={t.id} className="flex items-start justify-between gap-3 rounded-field bg-paper px-4 py-3">
               <span className="py-2 leading-relaxed">{t.body}</span>
-              <span className="flex shrink-0 gap-3 text-sm">
+              <span className="flex shrink-0 gap-1 text-sm">
                 <button
                   type="button"
-                  className="min-h-11 font-semibold text-berry-deep underline underline-offset-4"
+                  className="min-h-11 min-w-11 font-semibold text-berry-deep underline underline-offset-4"
                   aria-label={`미션 수정: ${t.body}`}
                   onClick={() => {
                     setEditingId(t.id);
@@ -75,7 +75,7 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
                 <button
                   type="button"
                   disabled={pending}
-                  className="min-h-11 font-semibold text-danger underline underline-offset-4 disabled:opacity-50"
+                  className="min-h-11 min-w-11 font-semibold text-danger underline underline-offset-4 disabled:opacity-50"
                   aria-label={`미션 삭제: ${t.body}`}
                   onClick={() => run(() => deleteTemplateAction(code, t.id))}
                 >
@@ -102,7 +102,7 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
           value={newBody}
           onChange={(e) => setNewBody(e.target.value)}
           placeholder="예: 오늘 커피 한 잔 챙겨 주기"
-          className="min-h-12 rounded-field border-2 border-line bg-card px-4 focus:border-berry focus:outline-none"
+          className="min-h-12 rounded-field border border-line bg-card px-4 focus:border-berry focus:ring-4 focus:ring-berry/15 focus:outline-none"
         />
         <Button type="submit" variant="soft" disabled={pending || newBody.trim() === ""}>
           추가하기
