@@ -45,8 +45,8 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
           <>
             <JoinForm code={event.code} />
             {candidates.length > 0 && (
-              <details className="group rounded-card border border-dashed border-line px-5 py-4">
-                <summary className="cursor-pointer list-none font-semibold text-berry-deep">
+              <details className="group rounded-card border border-dashed border-line px-5 py-2">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center font-semibold text-berry-deep">
                   이미 입장했어요
                   <span className="ml-1 inline-block transition group-open:rotate-90" aria-hidden="true">
                     ›
@@ -116,12 +116,15 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
         </>
       )}
       {event.status === "revealed" && (
-        <p role="status" className="rounded-field bg-sun-tint px-4 py-3 text-sm font-medium text-ink">
-          이벤트가 끝났어요.{" "}
-          <Link href={`/e/${event.code}/result`} className="font-semibold text-berry-deep underline underline-offset-4">
+        <div role="status" className="flex items-center justify-between gap-3 rounded-field bg-sun-tint py-2 pr-2 pl-4 text-sm font-medium text-ink">
+          이벤트가 끝났어요.
+          <Link
+            href={`/e/${event.code}/result`}
+            className="flex min-h-11 shrink-0 items-center rounded-pill bg-berry px-5 font-semibold text-white"
+          >
             결과 보러 가기
           </Link>
-        </p>
+        </div>
       )}
       <Feed code={event.code} items={feed} readOnly={!active} />
     </Screen>

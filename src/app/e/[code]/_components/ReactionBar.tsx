@@ -46,12 +46,12 @@ export function ReactionBar({
               aria-pressed={mine}
               onClick={() => toggle(emoji)}
               aria-label={`${emoji} 반응${r ? ` ${r.count}개` : ""}`}
-              className={`flex min-h-10 items-center justify-center gap-1 rounded-pill text-base transition disabled:cursor-default ${
+              className={`flex min-h-11 items-center justify-center gap-1 rounded-pill text-base transition disabled:cursor-default ${
                 mine
                   ? "border border-sun bg-sun-tint px-3"
                   : r
                     ? "border border-line bg-card px-3"
-                    : "min-w-10 px-1 opacity-45 grayscale hover:bg-paper hover:opacity-100 hover:grayscale-0"
+                    : "min-w-11 px-1 opacity-45 grayscale hover:bg-paper hover:opacity-100 hover:grayscale-0"
               }`}
             >
               <span aria-hidden="true">{emoji}</span>

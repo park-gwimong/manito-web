@@ -5,7 +5,7 @@ import { formatTemp } from "@/lib/format";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-4 pt-8 pb-12 lg:max-w-6xl lg:justify-center lg:px-8">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(3rem+env(safe-area-inset-bottom))] lg:max-w-6xl lg:justify-center lg:px-8">
       {isDev() && (
         <Link
           href="/dev"

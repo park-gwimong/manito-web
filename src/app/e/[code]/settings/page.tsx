@@ -6,7 +6,7 @@ import { countUnguessed } from "@/domain/reveal";
 import { getLobby } from "@/domain/views";
 import { toKstInput } from "@/lib/format";
 import { getViewer } from "@/lib/viewer";
-import { Card, Screen } from "../../../_components/ui";
+import { BackLink, Card, Screen } from "../../../_components/ui";
 import { ActiveControls } from "../_components/OrganizerControls";
 import { ParticipantAdmin } from "../_components/ParticipantAdmin";
 import { PresentationStart, SettingsForm } from "../_components/SettingsForm";
@@ -15,7 +15,7 @@ import { TemplateEditor } from "../_components/TemplateEditor";
 export const metadata = { title: "설정" };
 
 // 개설자 전용. 개설자가 아니면 아무 데이터도 읽기 전에 홈으로 돌려보낸다.
-export default async function SettingsPage({ params }: PageProps<"/e/[code]/settings">) {
+export default async function SettingsPage({ params, searchParams }: PageProps<"/e/[code]/settings">) {
   const viewer = await getViewer((await params).code);
   if (!viewer) notFound();
   const { event, me } = viewer;
@@ -28,9 +28,14 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
     event.status === "closed" ? countUnguessed(db, event.id) : Promise.resolve(0),
   ]);
   const preparing = event.status === "preparing";
+  // 발표 화면에서 나올 때 넘겨받은 장 번호. 다시 열 때 그 장부터 이어 준다.
+  const rawSlide = Number((await searchParams).s);
+  const resumeAt = Number.isInteger(rawSlide) && rawSlide > 0 ? rawSlide : 0;
 
   return (
     <Screen>
+      {/* 준비 단계에는 메뉴가 없으므로 대기 화면으로 돌아가는 길을 둔다. */}
+      {preparing && <BackLink href={`/e/${event.code}`}>대기 화면으로</BackLink>}
       <h1 className="font-display text-3xl leading-tight text-ink">설정</h1>
 
       {preparing && (
@@ -54,6 +59,7 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
           code={event.code}
           started={event.presentationStartedAt !== null}
           unguessed={unguessed}
+          resumeAt={resumeAt}
         />
       )}
 
@@ -64,6 +70,15 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
             결과 보러 가기
           </Link>
         </Card>
+      )}
+
+      {preparing && (
+        <Link
+          href={`/e/${event.code}`}
+          className="flex min-h-12 items-center justify-center rounded-pill bg-berry-tint px-6 font-semibold text-berry-deep"
+        >
+          대기 화면으로 돌아가기
+        </Link>
       )}
 
       <ParticipantAdmin

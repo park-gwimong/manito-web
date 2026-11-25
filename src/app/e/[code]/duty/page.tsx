@@ -18,9 +18,10 @@ export default async function DutyPage({ params }: PageProps<"/e/[code]/duty">) 
   const viewer = await getViewer(code);
   if (!viewer) notFound();
   const { event, me } = viewer;
-  if (!me) redirect(`/e/${event.code}`);
+  // 시작 전에는 메뉴도 내용도 없으므로 대기 화면으로 보낸다.
+  if (!me || event.status === "preparing") redirect(`/e/${event.code}`);
 
-  const duty = event.status === "preparing" ? null : await getDuty(getDb(), event.id, me.id);
+  const duty = await getDuty(getDb(), event.id, me.id);
   const active = event.status === "active";
 
   return (

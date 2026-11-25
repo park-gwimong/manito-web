@@ -70,7 +70,7 @@ export function SecretDeeds({
                 type="button"
                 disabled={pending}
                 onClick={() => remove(d.id)}
-                className="shrink-0 text-sm font-semibold text-danger underline underline-offset-4 disabled:opacity-50"
+                className="-my-2 -mr-2 min-h-11 min-w-11 shrink-0 text-sm font-semibold text-danger underline underline-offset-4 disabled:opacity-50"
               >
                 삭제
               </button>

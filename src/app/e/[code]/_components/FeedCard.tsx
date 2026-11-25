@@ -96,7 +96,7 @@ export function FeedCard({ code, item, readOnly = false }: { code: string; item:
           <div className="ml-auto flex gap-1 text-sm">
             <button
               type="button"
-              className="min-h-10 rounded-field px-3 font-semibold text-ink-soft hover:bg-paper hover:text-ink"
+              className="min-h-11 rounded-field px-3 font-semibold text-ink-soft hover:bg-paper hover:text-ink"
               onClick={() => setEditing(true)}
             >
               수정
@@ -104,7 +104,7 @@ export function FeedCard({ code, item, readOnly = false }: { code: string; item:
             <button
               type="button"
               disabled={pending}
-              className="min-h-10 rounded-field px-3 font-semibold text-danger hover:bg-danger-tint disabled:opacity-50"
+              className="min-h-11 rounded-field px-3 font-semibold text-danger hover:bg-danger-tint disabled:opacity-50"
               onClick={remove}
             >
               삭제

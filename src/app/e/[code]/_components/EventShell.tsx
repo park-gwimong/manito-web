@@ -159,7 +159,7 @@ export function EventShell({
       {/* 휴대폰: 화면 아래에 떠 있는 알약 모양 메뉴 */}
       <nav
         aria-label="이벤트 메뉴"
-        className="glass fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 mx-auto max-w-sm rounded-pill border border-line p-1.5 shadow-lift lg:hidden"
+        className="mobile-tabs glass fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 mx-auto max-w-sm rounded-pill border border-line p-1.5 shadow-lift lg:hidden"
       >
         <ul className="flex gap-1">
           {tabs.map((tab) => {

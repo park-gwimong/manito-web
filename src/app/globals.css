@@ -138,3 +138,13 @@ body {
     animation: mercury-grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 }
+
+/*
+ * 터치 기기에서 글을 쓰는 동안에는 아래 메뉴를 숨긴다.
+ * 화면 키보드가 올라오면 떠 있는 메뉴가 입력창 바로 위를 가려 쓰던 글이 보이지 않게 되기 때문이다.
+ */
+@media (pointer: coarse) {
+  body:has(textarea:focus, input:not([type="checkbox"]):not([type="radio"]):focus) .mobile-tabs {
+    display: none;
+  }
+}

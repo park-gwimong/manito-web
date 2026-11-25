@@ -108,7 +108,7 @@ export function CreateEventForm({
 
       <ProblemList problems={problems} />
       <ErrorText>{problems.length === 0 && state && !state.result.ok ? state.result.error : null}</ErrorText>
-      <Button type="submit" disabled={pending} className="sticky bottom-4">
+      <Button type="submit" disabled={pending} className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))]">
         {pending ? "만드는 중…" : "이벤트 만들기"}
       </Button>
     </form>

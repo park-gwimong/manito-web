@@ -9,6 +9,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // 화면 가장자리까지 쓰고, 홈 막대 같은 안전 영역은 env(safe-area-inset-*)로 직접 비운다.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#faf6f4" },
     { media: "(prefers-color-scheme: dark)", color: "#14111a" },

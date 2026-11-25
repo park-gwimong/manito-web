@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Button, Card, Screen } from "../../../_components/ui";
 import { StartNowButton } from "./OrganizerControls";
 import { PinResetTrace } from "./PinResetTrace";
@@ -96,8 +96,28 @@ export function Lobby(props: Props) {
 }
 
 /** 초대장. 이벤트 코드를 크게 보여 주고 링크를 복사한다. */
+const noSubscribe = () => () => {};
+
 function InviteTicket({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
+  // 휴대폰에는 공유 시트(메신저로 바로 보내기)가 있다. 서버에서는 알 수 없으니 화면에 붙은 뒤에 확인한다.
+  const canShare = useSyncExternalStore(
+    noSubscribe,
+    () => typeof navigator.share === "function",
+    () => false,
+  );
+
+  async function share() {
+    try {
+      await navigator.share({
+        title: "마니또 초대",
+        text: "마니또에 초대할게요. 링크로 들어와 이름과 PIN을 정해 주세요.",
+        url: `${window.location.origin}/e/${code}`,
+      });
+    } catch {
+      // 공유를 취소한 경우. 아무것도 하지 않는다.
+    }
+  }
 
   async function copy() {
     const url = `${window.location.origin}/e/${code}`;
@@ -118,9 +138,20 @@ function InviteTicket({ code }: { code: string }) {
       <p className="text-sm text-white/80">초대 코드</p>
       <p className="font-display text-4xl tracking-[0.15em] text-sun">{code}</p>
       <div className="my-4 border-t border-dashed border-white/30" />
-      <Button type="button" variant="soft" onClick={copy} className="w-full" aria-live="polite">
-        {copied ? "링크를 복사했어요" : "초대 링크 복사하기"}
-      </Button>
+      <div className="flex flex-col gap-2">
+        {canShare && (
+          <button
+            type="button"
+            onClick={share}
+            className="min-h-12 w-full rounded-pill bg-sun px-6 font-semibold text-sun-ink transition active:scale-[0.97]"
+          >
+            초대 링크 보내기
+          </button>
+        )}
+        <Button type="button" variant="soft" onClick={copy} className="w-full" aria-live="polite">
+          {copied ? "링크를 복사했어요" : "초대 링크 복사하기"}
+        </Button>
+      </div>
     </section>
   );
 }

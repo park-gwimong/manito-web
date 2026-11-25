@@ -93,8 +93,8 @@ function OrganizerPinReset({ code }: { code: string }) {
   );
 
   return (
-    <details className="group rounded-field border border-dashed border-line px-4 py-3">
-      <summary className="cursor-pointer list-none text-sm font-semibold text-ink-soft">
+    <details className="group rounded-field border border-dashed border-line px-4 py-1">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-ink-soft">
         개설자 PIN을 잊었어요
       </summary>
       <form action={formAction} className="flex flex-col gap-3 pt-3">

@@ -60,10 +60,10 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
           ) : (
             <li key={t.id} className="flex items-start justify-between gap-3 rounded-field bg-paper px-4 py-3">
               <span className="py-2 leading-relaxed">{t.body}</span>
-              <span className="flex shrink-0 gap-3 text-sm">
+              <span className="flex shrink-0 gap-1 text-sm">
                 <button
                   type="button"
-                  className="min-h-11 font-semibold text-berry-deep underline underline-offset-4"
+                  className="min-h-11 min-w-11 font-semibold text-berry-deep underline underline-offset-4"
                   aria-label={`미션 수정: ${t.body}`}
                   onClick={() => {
                     setEditingId(t.id);
@@ -75,7 +75,7 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
                 <button
                   type="button"
                   disabled={pending}
-                  className="min-h-11 font-semibold text-danger underline underline-offset-4 disabled:opacity-50"
+                  className="min-h-11 min-w-11 font-semibold text-danger underline underline-offset-4 disabled:opacity-50"
                   aria-label={`미션 삭제: ${t.body}`}
                   onClick={() => run(() => deleteTemplateAction(code, t.id))}
                 >

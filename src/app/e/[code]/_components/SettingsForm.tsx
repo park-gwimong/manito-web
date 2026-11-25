@@ -85,9 +85,12 @@ export function PresentationStart({
   code,
   started,
   unguessed,
+  resumeAt = 0,
 }: {
   code: string;
   started: boolean;
+  /** 발표 화면에서 나오기 전에 보던 장. 0이면 처음부터. */
+  resumeAt?: number;
   /** 아직 추측하지 않은 사람 수(이름은 받지 않는다). */
   unguessed: number;
 }) {
@@ -101,7 +104,7 @@ export function PresentationStart({
     setError(null);
     startTransition(async () => {
       const result: ActionResult = started ? { ok: true } : await startPresentationAction(code);
-      if (result.ok) router.push(`/e/${code}/present`);
+      if (result.ok) router.push(resumeAt > 0 ? `/e/${code}/present?s=${resumeAt}` : `/e/${code}/present`);
       else setError(result.error);
     });
   }
@@ -111,7 +114,9 @@ export function PresentationStart({
       <h2 className="font-display text-xl">결과 발표</h2>
       <p className="text-sm leading-relaxed text-ink-soft">
         {started
-          ? "발표가 시작됐어요. 큰 화면에 이어서 띄워 주세요."
+          ? resumeAt > 0
+            ? `발표가 시작됐어요. 다시 열면 보던 ${resumeAt + 1}번째 장부터 이어져요.`
+            : "발표가 시작됐어요. 큰 화면에 이어서 띄워 주세요."
           : "큰 화면(TV나 빔프로젝터)에 연결한 기기에서 시작해 주세요."}
       </p>
       {!started && (

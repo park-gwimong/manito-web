@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 // 화면 공통 기본 요소. 상태가 없어 서버·클라이언트 컴포넌트 어디서든 쓸 수 있다.
@@ -90,7 +91,7 @@ export function ErrorText({ children }: { children?: ReactNode }) {
 
 /** 모바일 한 손 조작용 화면 틀. 가운데 좁은 기둥, 본문은 왼쪽 정렬. */
 export function Screen({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <main className={`mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-8 pb-28 lg:max-w-xl lg:pt-12 lg:pb-16 ${className}`}>{children}</main>;
+  return <main className={`mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))] lg:max-w-xl lg:pt-12 lg:pb-16 ${className}`}>{children}</main>;
 }
 
 // 사람마다 다른 색 스티커. 이름으로 정해지므로 어느 화면에서나 같은 색이다.
@@ -117,6 +118,19 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md"
     >
       {Array.from(name.trim())[0] ?? "?"}
     </span>
+  );
+}
+
+/** 화면 맨 위에 두는 돌아가기 링크. 메뉴가 없는 화면이 막다른 길이 되지 않게 한다. */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="-ml-2 flex min-h-11 items-center gap-1 self-start rounded-field px-2 text-sm font-semibold text-ink-soft hover:bg-paper-deep hover:text-ink"
+    >
+      <span aria-hidden="true">←</span>
+      {children}
+    </Link>
   );
 }
 

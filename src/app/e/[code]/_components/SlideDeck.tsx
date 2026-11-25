@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { formatTemp } from "@/lib/format";
@@ -44,8 +45,8 @@ export function SlideDeck({ code, slides, initialIndex }: { code: string; slides
       onClick={() => go(index + 1)}
       className="theme-light relative flex min-h-dvh cursor-pointer flex-col overflow-hidden bg-berry text-white select-none"
     >
-      <span aria-hidden="true" className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-berry-deep" />
-      <span aria-hidden="true" className="absolute -right-20 -bottom-28 h-96 w-96 rounded-full bg-berry-deep" />
+      <span aria-hidden="true" className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-berry-deep sm:h-72 sm:w-72" />
+      <span aria-hidden="true" className="absolute -right-20 -bottom-28 h-56 w-56 rounded-full bg-berry-deep sm:h-96 sm:w-96" />
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-[6vw] py-[6vh] text-center">
         <SlideBody slide={slide} code={code} />
@@ -63,8 +64,14 @@ export function SlideDeck({ code, slides, initialIndex }: { code: string; slides
         >
           ← 이전
         </button>
-        <span aria-label={`${slides.length}장 중 ${index + 1}장`} className="font-display text-white/70">
-          {index + 1} / {slides.length}
+        <span className="flex flex-col items-center gap-1">
+          <span aria-label={`${slides.length}장 중 ${index + 1}장`} className="font-display text-white/70">
+            {index + 1} / {slides.length}
+          </span>
+          {/* 발표를 잠시 멈추고 나갈 길. 보던 장 번호를 넘겨, 설정에서 다시 열면 그 장부터 이어진다. */}
+          <Link href={`/e/${code}/settings?s=${index}`} className="text-sm text-white/60 underline underline-offset-4 hover:text-white">
+            발표 화면 나가기
+          </Link>
         </span>
         <button
           type="button"

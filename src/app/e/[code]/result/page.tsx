@@ -31,7 +31,7 @@ export default async function ResultPage({ params }: PageProps<"/e/[code]/result
         <h1 className="font-display text-3xl leading-tight text-ink">마니또 결과</h1>
       </header>
       <ResultView data={data} meId={me.id} />
-      <Link href={`/e/${event.code}`} className="text-center font-semibold text-berry-deep underline underline-offset-4">
+      <Link href={`/e/${event.code}`} className="flex min-h-12 items-center justify-center rounded-pill bg-berry-tint px-6 font-semibold text-berry-deep">
         홈으로
       </Link>
     </Screen>
