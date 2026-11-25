@@ -7,6 +7,7 @@ import { getLobby } from "@/domain/views";
 import { toKstInput } from "@/lib/format";
 import { getViewer } from "@/lib/viewer";
 import { Card, Screen } from "../../../_components/ui";
+import { ActiveControls } from "../_components/OrganizerControls";
 import { ParticipantAdmin } from "../_components/ParticipantAdmin";
 import { PresentationStart, SettingsForm } from "../_components/SettingsForm";
 import { TemplateEditor } from "../_components/TemplateEditor";
@@ -46,6 +47,8 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
         </>
       )}
 
+      {event.status === "active" && <ActiveControls code={event.code} endsAtInput={toKstInput(event.endsAt)} />}
+
       {event.status === "closed" && (
         <PresentationStart
           code={event.code}
@@ -63,7 +66,12 @@ export default async function SettingsPage({ params }: PageProps<"/e/[code]/sett
         </Card>
       )}
 
-      <ParticipantAdmin code={event.code} participants={lobby.participants} canRemove={preparing} />
+      <ParticipantAdmin
+        code={event.code}
+        participants={lobby.participants}
+        canRemove={preparing || event.status === "active"}
+        midEvent={event.status === "active"}
+      />
     </Screen>
   );
 }

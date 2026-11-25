@@ -172,11 +172,11 @@ test("시작 뒤 입장은 NOT_PREPARING이고, 배정은 시작 시점 참가�
   expect(rows.map((r) => r.receiverId).sort()).toEqual(expected);
 });
 
-test("시작 뒤 내보내기는 NOT_PREPARING이고 배정은 그대로", async () => {
+test("마감 뒤 내보내기는 NOT_REMOVABLE이고 배정은 그대로", async () => {
   const people = await join(3);
-  await advanceEvent(db, event.id, startsAt);
+  await advanceEvent(db, event.id, endsAt);
   await expect(removeParticipant(db, organizer.id, people[0].id)).rejects.toMatchObject({
-    code: "NOT_PREPARING",
+    code: "NOT_REMOVABLE",
   });
   expect(await assignmentsOf(event.id)).toHaveLength(4);
 });

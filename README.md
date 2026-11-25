@@ -1,87 +1,161 @@
-# 마니또
+# 마니또 (manito-web)
 
-5~10명 모임이 며칠 동안 서로의 마니또가 되어 보는 웹 서비스입니다. Next.js(App Router) + PostgreSQL(Drizzle ORM)로 만들었고, NCP 서버 한 대에 Docker로 배포하도록 구성했습니다.
+5~10명 모임이 며칠 동안 서로의 마니또가 되어 보는 웹 서비스입니다. 배정하고 끝나는 것이 아니라, 기간 내내 받은 사람이 기록을 남기고 모두가 피드로 보며, 끝나는 날 한 화면에서 결과를 함께 열어 봅니다.
 
-## 로컬 실행
+직접 서버에 올려 쓰는 셀프 호스팅 방식이고, Docker가 도는 서버 한 대면 충분합니다.
 
-1. DB를 띄웁니다.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-   ```bash
-   cp .env.example .env     # 값을 채운다 (아래 환경변수 표 참고)
-   docker compose up db -d
-   ```
+## 목차
 
-   `docker compose`는 `.env`의 `POSTGRES_PASSWORD`가 필요합니다. 로컬에서 앱(`yarn dev`)이 DB에 접속하려면 db 컨테이너의 5432 포트가 호스트로 열려 있어야 하는데, 배포용 `docker-compose.yml`은 보안상 포트를 공개하지 않습니다. 로컬 개발용으로는 별도 파일을 만들어 함께 쓰세요.
+- [무엇을 할 수 있나요](#무엇을-할-수-있나요)
+- [진행 흐름](#진행-흐름)
+- [기술 구성](#기술-구성)
+- [빠른 시작](#빠른-시작)
+- [환경변수](#환경변수)
+- [배포](#배포)
+- [프로젝트 구조](#프로젝트-구조)
+- [기여하기](#기여하기)
+- [보안](#보안)
+- [라이선스](#라이선스)
 
-   ```yaml
-   # docker-compose.local.yml (커밋하지 않기)
-   services:
-     db:
-       ports:
-         - "127.0.0.1:5432:5432"
-   ```
+## 무엇을 할 수 있나요
 
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.local.yml up db -d
-   ```
+- **비밀 배정** — 시작 일시에 서버가 전원을 하나의 고리(A→B→C→…→A)로 무작위 배정합니다. 각자 자기 대상만 볼 수 있고, 개설자도 배정을 볼 수 없습니다.
+- **받은 사람이 쓰는 기록** — "책상에 커피가 놓여 있었어요" 같은 글을 받은 사람이 올리면 전원의 피드에 보입니다. 글에는 이모지 반응을 달 수 있습니다.
+- **마니또의 몰래 판정** — 기록 작성자의 마니또에게만, 본인만 보는 `내 임무` 화면에서 `맞아요 / 제가 아니에요` 버튼이 보입니다. 결과는 발표 때까지 작성자를 포함해 누구에게도 보이지 않습니다.
+- **몰래 한 일** — 대상이 눈치채지 못한 선행을 마니또가 본인만 보는 메모로 남기고, 발표 때 공개합니다.
+- **자동 미션** — 기본 미션 목록에서 기간에 고르게 나눠 각자에게 하나씩 내려줍니다. 개설자는 시작 전에 목록을 고칠 수 있습니다.
+- **포인트와 모임 온도** — 개인 참여 포인트와 모두의 활동으로 오르는 온도(36.5℃에서 시작)를 실시간으로 보여줍니다. 실시간 숫자는 배정이나 판정과 무관한 활동으로만 움직여서 누가 누구의 마니또인지 드러나지 않습니다.
+- **알림** — 미션 도착, 내 대상의 새 기록, 마감과 발표를 웹 푸시로 알려 줍니다. 알림 글귀에는 사람 이름이 들어가지 않습니다. VAPID 키를 설정했을 때만 켜집니다.
+- **개설자 도구** — 인원이 모이면 시작 시각 전에 바로 시작하고, 진행 중에 종료 일시를 바꾸거나 바로 마감할 수 있습니다. 진행 중에 빠진 사람을 내보내면 그 사람의 마니또가 대상을 이어받아 고리가 유지됩니다.
+- **결과 발표** — 마감 후 각자 내 마니또를 추측하고, 개설자가 큰 화면에서 한 장씩 넘기며 공개합니다. 발표가 끝나면 전원의 폰에서 결과가 열립니다.
 
-   이미 로컬에 PostgreSQL이 있다면 그것을 써도 됩니다. `.env`의 `DATABASE_URL`만 맞추세요.
+회원가입은 없습니다. 초대 링크로 들어와 이름과 4자리 PIN을 정하면 됩니다. 화면은 한국어, 시간대는 Asia/Seoul 고정이고 휴대폰 화면을 기준으로 만들었습니다(발표 화면만 큰 화면 기준).
 
-2. 의존성을 설치하고 개발 서버를 실행합니다. (yarn 1.x 사용)
+## 진행 흐름
 
-   ```bash
-   yarn install
-   yarn dev
-   ```
+`준비 → 진행 → 마감 → 발표 완료`
 
-   개발 서버(`yarn dev`)는 직접 실행합니다. 개발 모드에서는 마이그레이션이 자동으로 돌지 않으므로, 처음에는 `yarn seed:demo preparing`처럼 데모 데이터를 한 번 만들어 테이블을 준비하세요(데모 스크립트가 마이그레이션을 먼저 적용합니다).
+| 단계 | 넘어가는 조건 | 할 수 있는 것 |
+| --- | --- | --- |
+| 준비 | 이벤트 개설 | 초대 링크로 입장, 개설자가 설정과 미션 목록 수정 |
+| 진행 | 시작 일시 도달 (자동) 또는 개설자의 `지금 시작하기` | 기록, 반응, 판정, 미션, 몰래 한 일 메모 |
+| 마감 | 종료 일시 도달 (자동) 또는 개설자의 `지금 마감하기` | 내 마니또 추측, 개설자의 발표 진행 |
+| 발표 완료 | 개설자가 발표를 끝냄 | 전원이 결과와 전체 기록 열람 |
 
-## 테스트와 타입 검사
+- 이벤트 개설(`/new`)은 서버에 설정한 관리 비밀번호(`ADMIN_PASSWORD`)를 아는 사람만 할 수 있습니다.
+- 단계 전환과 미션 배달은 서버가 1분마다 점검해 처리하므로, 아무도 접속하지 않아도 제때 넘어갑니다.
+- 시작할 때 그때까지 입장한 사람으로 명단이 확정됩니다. 최소 인원은 4명이고, 모자라면 시작하지 않고 준비 단계에 머뭅니다.
+- 한 서버에서 이벤트 여러 개를 동시에 운영할 수 있습니다.
+
+개설자와 참가자가 화면에서 무엇을 어떻게 하는지는 [사용 설명서](docs/USER_GUIDE.md)에 있습니다. 자세한 규칙과 그렇게 정한 이유는 [설계 문서](docs/superpowers/specs/2026-11-24-manito-design.md)에 있습니다.
+
+## 기술 구성
+
+- [Next.js](https://nextjs.org/) 16 (App Router, Server Actions), React 19, Tailwind CSS 4
+- PostgreSQL 16, [Drizzle ORM](https://orm.drizzle.team/)
+- 테스트: Vitest + [PGlite](https://pglite.dev/) (별도 DB 없이 실행)
+- 배포: Docker Compose, 리버스 프록시는 Caddy 권장
+
+## 빠른 시작
+
+Node.js 24와 yarn 1.x만 있으면 됩니다. Docker도 PostgreSQL도 필요 없습니다.
+
+```bash
+git clone https://github.com/park-gwimong/manito-web.git
+cd manito-web
+yarn install
+yarn dev
+```
+
+http://localhost:3000/dev 를 엽니다.
+
+개발 서버는 `DATABASE_URL`이 없으면 내장 DB([PGlite](https://pglite.dev/))를 `.local/pgdata`에 만들어 쓰고, 처음 켤 때 단계별 샘플 이벤트 4개를 넣어 둡니다. `.env` 없이도 동작합니다(관리 비밀번호는 `admin`, 세션 키는 개발용 기본값).
+
+### 둘러보기 화면 (`/dev`)
+
+개발 서버에서만 열리는 화면입니다. 운영 빌드에서는 404입니다.
+
+- 준비, 진행, 마감, 발표 완료 단계의 샘플 이벤트가 하나씩 있고, 6명(민지 · 준호 · 서연 · 도윤 · 하은 · 지우)이 참여하고 있습니다. 민지가 개설자입니다.
+- 이름을 누르면 PIN 없이 그 사람으로 들어갑니다. 여러 사람의 화면을 번갈아 볼 수 있습니다. 로그인 화면을 직접 써 보려면 PIN은 모두 `0000`입니다.
+- 실제 서비스에서는 아무도 볼 수 없는 배정표(누가 누구를 챙기는지)를 보여 줍니다. 판정 버튼은 글쓴이의 마니또에게만 보이므로, 누구로 들어가야 하는지 여기서 확인합니다.
+- 단계마다 확인해 볼 것이 적혀 있습니다.
+
+| 샘플 단계 | 상태 |
+| --- | --- |
+| 준비 | 내일 시작. 참가자 6명이 로비에 모여 있음 |
+| 진행 | 3일 전에 시작해 4일 뒤 끝남. 기록, 반응, 판정, 몰래 한 일, 완료한 미션이 쌓여 있음 |
+| 마감 | 어제 마감됨. 마니또 추측까지 끝났고 발표 대기 중 (민지로 발표 시작 가능) |
+| 발표 완료 | 발표까지 끝난 결과 화면 |
+
+샘플은 만든 시점 기준이라 며칠 지나면 단계가 저절로 넘어갑니다. 처음 상태로 되돌리려면 개발 서버를 끄고 다음을 실행한 뒤 다시 켜세요.
+
+```bash
+yarn dev:reset
+```
+
+### PostgreSQL로 개발하기
+
+운영과 같은 DB로 확인하고 싶을 때만 필요합니다. `.env`에 `DATABASE_URL`을 넣으면 개발 서버가 그 DB에 마이그레이션을 적용하고, 이벤트가 하나도 없으면 같은 샘플을 넣습니다(`DEV_SEED=0`이면 넣지 않습니다).
+
+배포용 `docker-compose.yml`은 DB 포트를 호스트에 열지 않으므로 로컬용 파일을 하나 만들어 함께 씁니다.
+
+```yaml
+# docker-compose.local.yml (커밋하지 마세요)
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+```
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.local.yml up db -d
+yarn dev
+```
+
+샘플 이벤트를 더 만들려면 `yarn seed:demo <preparing|active|closed|revealed>`를 실행합니다. `DATABASE_URL`의 DB에 이벤트 하나를 추가하고 초대 링크 경로를 출력합니다.
+
+### 테스트와 검사
 
 ```bash
 yarn test            # 도메인 테스트 (PGlite, 별도 DB 불필요)
+yarn lint
 yarn next typegen    # 새로 clone했다면 먼저 실행 (또는 yarn build)
 yarn tsc --noEmit
 ```
 
 `PageProps`, `LayoutProps` 같은 라우트 타입은 `yarn next typegen`(또는 빌드)이 만들어 줍니다. 새로 clone한 직후에 `tsc`만 실행하면 이 타입을 찾지 못해 실패합니다.
 
-## 데모 데이터
-
-```bash
-yarn seed:demo <단계>      # preparing | active | closed | revealed
-```
-
-프로젝트 루트의 `.env`를 읽어 `DATABASE_URL`의 DB에 만듭니다. 필요하면 마이그레이션을 먼저 적용하고, 6명(민지 · 준호 · 서연 · 도윤 · 하은 · 지우)이 참여한 이벤트를 요청한 단계까지 진행시켜 만듭니다. 실제 서비스와 같은 도메인 함수만 사용하고 과거 시각을 넘겨 시간이 흐른 것처럼 만듭니다. 끝나면 초대 링크 경로(`/e/<코드>`)와 참가자 이름이 출력되고, **PIN은 모두 `0000`** 입니다.
-
-| 단계 | 상태 |
-| --- | --- |
-| `preparing` | 시작 전. 참가자 6명이 로비에 모여 있음 |
-| `active` | 3일 전에 시작해 4일 뒤 끝남. 기록, 반응, 판정, 몰래 한 일, 완료한 미션이 쌓여 있음 |
-| `closed` | 어제 마감됨. 마니또 추측까지 끝났고 발표 대기 중 (개설자 민지로 발표 시작 가능) |
-| `revealed` | 발표까지 끝난 결과 화면 |
-
-권장 확인 순서: `yarn seed:demo active`와 `yarn seed:demo closed`를 실행한 뒤 `yarn dev`로 접속해, 출력된 경로로 들어가 이름과 PIN `0000`으로 입장하여 진행 화면과 발표 화면을 직접 눌러 봅니다. 실행할 때마다 새 이벤트가 추가됩니다.
-
 ## 환경변수
 
 | 이름 | 설명 |
 | --- | --- |
-| `DATABASE_URL` | 앱이 접속할 PostgreSQL 주소. Docker Compose에서는 `POSTGRES_*` 값으로 자동 구성되어 이 값을 덮어씁니다. |
-| `SESSION_SECRET` | 세션 쿠키 서명 키. **길고 무작위인 문자열**이어야 합니다. `openssl rand -base64 48` 로 만드세요. 바꾸면 모든 사용자가 로그아웃됩니다. |
-| `ADMIN_PASSWORD` | 관리용 비밀번호 |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Compose가 만드는 DB 설정. 비밀번호는 URL에 들어가므로 영문·숫자만 쓰세요 (`openssl rand -hex 24`). |
-| `APP_PORT` | 앱을 공개할 호스트 포트 (기본 `3000`). 루프백(`127.0.0.1`)에만 열립니다. |
+| `DATABASE_URL` | 앱이 접속할 PostgreSQL 주소. Docker Compose에서는 `POSTGRES_*` 값으로 자동 구성되어 이 값을 덮어씁니다. 개발 서버에서는 비워 두면 내장 DB를 씁니다. |
+| `SESSION_SECRET` | 세션 쿠키 서명 키. 길고 무작위인 문자열이어야 합니다(`openssl rand -base64 48`). 바꾸면 모든 사용자가 로그아웃됩니다. |
+| `ADMIN_PASSWORD` | 이벤트 개설(`/new`)과 개설자 PIN 초기화에 쓰는 관리 비밀번호 |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Compose가 만드는 DB 설정. 비밀번호는 URL에 들어가므로 영문·숫자만 쓰세요(`openssl rand -hex 24`). |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | 웹 푸시 알림용 키 한 쌍(`npx web-push generate-vapid-keys`). 둘 다 있어야 알림 기능이 켜지고, 없으면 알림 칸이 화면에 나오지 않습니다. 개발 서버는 없으면 `.local/vapid.json`에 만들어 씁니다. 바꾸면 기존에 알림을 켠 기기는 다시 켜야 합니다. |
+| `VAPID_SUBJECT` | 푸시 서비스가 운영자에게 연락할 주소. `mailto:you@example.com` 또는 `https://` 주소. 알림을 쓴다면 실제 연락처로 설정하세요. |
+| `APP_PORT` | 앱을 공개할 호스트 포트(기본 `3000`). 루프백(`127.0.0.1`)에만 열립니다. |
+| `DEV_SEED` | 개발 서버 전용. `0`이면 샘플 이벤트를 넣지 않습니다. |
 
-## NCP 배포
+## 배포
 
-1. **서버 생성** — NCP 콘솔에서 Ubuntu 서버(1 vCPU / 2GB 이상)를 만들고 공인 IP를 붙입니다.
-2. **Docker 설치** — 서버에 접속해 Docker Engine과 Compose 플러그인을 설치합니다. ([공식 설치 문서](https://docs.docker.com/engine/install/ubuntu/))
-3. **ACG에서 80/443 열기** — 서버에 연결된 ACG(방화벽)의 인바운드에 TCP 80, 443을 허용합니다. SSH(22)는 관리하는 IP로 제한하세요. 3000과 5432는 열지 않습니다.
-4. **`.env` 작성** — 서버에서 저장소를 clone하고 `.env.example`을 복사한 뒤, 비밀값 세 개를 **반드시 새로 만들어 교체**합니다. 이 페이지는 공개되고 `ADMIN_PASSWORD`가 `/new`(이벤트 개설)를 지키므로, `change-me` 같은 예시 값을 운영에 그대로 쓰면 안 됩니다. (`POSTGRES_PASSWORD`는 비어 있는 경우만 compose가 막으므로 `change-me`도 통과해 버립니다.)
+Docker가 설치된 리눅스 서버 한 대와 그 서버를 가리키는 도메인이 필요합니다. 클라우드 종류는 가리지 않습니다. 메모리 2GB 정도면 실행에는 충분하지만, 서버에서 직접 이미지를 빌드하려면 디스크 여유가 5GB 이상 있어야 합니다.
+
+**반드시 HTTPS로 서비스해야 합니다.** 운영 환경에서는 세션 쿠키에 `secure` 속성이 붙기 때문에, 일반 HTTP로 접속하면 브라우저가 쿠키를 저장하지 않아 로그인이 오류 없이 조용히 실패합니다.
+
+1. **방화벽** — 인바운드 TCP 80, 443을 엽니다. SSH(22)는 관리하는 IP로 제한하고, 3000과 5432는 열지 않습니다.
+
+2. **Docker 설치** — Docker Engine과 Compose 플러그인을 설치합니다. ([공식 설치 문서](https://docs.docker.com/engine/install/))
+
+3. **`.env` 작성** — 저장소를 clone하고 비밀값 세 개를 새로 만들어 넣습니다. 서비스가 인터넷에 공개되고 `ADMIN_PASSWORD`가 이벤트 개설을 지키므로, `change-me` 같은 예시 값을 그대로 쓰면 안 됩니다. (`POSTGRES_PASSWORD`는 비어 있는 경우만 compose가 막으므로 `change-me`도 통과해 버립니다.)
 
    ```bash
-   cp .env.example .env
+   git clone https://github.com/park-gwimong/manito-web.git && cd manito-web
+   cp .env.example .env && chmod 600 .env
    sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 48)|" .env
    sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
    sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$(openssl rand -hex 12)|" .env
@@ -89,17 +163,40 @@ yarn seed:demo <단계>      # preparing | active | closed | revealed
    grep ADMIN_PASSWORD .env    # 개설할 때 쓸 비밀번호이니 따로 적어 두세요
    ```
 
-   `DATABASE_URL`은 compose가 `POSTGRES_*`로 다시 만들므로 운영에서는 쓰이지 않습니다(그래서 위 확인 명령은 이 줄을 빼고 봅니다). 직접 편집하려면 `SESSION_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD` 세 줄을 각각 원하는 강한 값으로 바꾸면 됩니다.
+   `DATABASE_URL`은 compose가 `POSTGRES_*`로 다시 만들므로 운영에서는 쓰이지 않습니다(그래서 위 확인 명령은 이 줄을 빼고 봅니다).
 
-5. **실행** — 이미지를 빌드해 백그라운드로 띄웁니다. 앱은 시작할 때 마이그레이션을 먼저 적용하고, 실패하면 서버가 뜨지 않습니다(`docker compose logs app`으로 확인).
+4. **실행** — 아래 두 방법 중 하나를 고릅니다. 어느 쪽이든 앱은 시작할 때 마이그레이션을 먼저 적용하고, 실패하면 서버가 뜨지 않습니다(`docker compose logs app`으로 확인).
+
+   **방법 A: 서버에서 빌드**
 
    ```bash
    docker compose up -d --build
    ```
 
-   DB는 이름 있는 볼륨(`pgdata`)에 저장되며 외부로 포트를 공개하지 않습니다. 앱은 호스트의 루프백 주소 `127.0.0.1:3000`으로만 열리므로, 바깥에서는 아래 Caddy를 통해서만 접속할 수 있습니다.
+   **방법 B: 다른 PC에서 빌드해 이미지만 전송** — 서버 디스크나 메모리가 작을 때 씁니다. 빌드하는 PC에서:
 
-6. **리버스 프록시와 HTTPS (Caddy 권장)** — **세션 쿠키는 운영 환경에서 `secure` 속성이 붙으므로 반드시 HTTPS로 서비스해야 합니다.** 일반 HTTP로 접속하면 브라우저가 쿠키를 저장하지 않아 로그인이 오류 없이 조용히 실패합니다. 도메인을 서버 공인 IP로 연결한 뒤 Caddy를 설치하고(`apt install caddy`) `/etc/caddy/Caddyfile`을 다음처럼 작성합니다. 인증서는 Caddy가 자동으로 발급·갱신합니다.
+   ```bash
+   TAG=$(git rev-parse --short HEAD)
+   docker build --platform linux/amd64 -t manito-web:$TAG .
+   docker save manito-web:$TAG | gzip | ssh <사용자>@<서버> 'gunzip | docker load'
+   ```
+
+   서버의 저장소 폴더에 `docker-compose.override.yml`을 만들어 그 이미지를 쓰게 합니다(`<TAG>`는 위에서 만든 태그).
+
+   ```yaml
+   services:
+     app:
+       image: manito-web:<TAG>
+       pull_policy: never
+   ```
+
+   ```bash
+   docker compose up -d --no-build
+   ```
+
+   DB는 이름 있는 볼륨(`pgdata`)에 저장되며 외부로 포트를 공개하지 않습니다. 앱은 호스트의 루프백 주소 `127.0.0.1:3000`으로만 열리므로, 바깥에서는 아래 리버스 프록시를 통해서만 접속할 수 있습니다.
+
+5. **리버스 프록시와 HTTPS** — Caddy를 권장합니다. 설치하고(`apt install caddy`) `/etc/caddy/Caddyfile`을 다음처럼 작성하면 인증서를 자동으로 발급·갱신합니다.
 
    ```caddyfile
    manito.example.com {
@@ -111,15 +208,59 @@ yarn seed:demo <단계>      # preparing | active | closed | revealed
    sudo systemctl reload caddy
    ```
 
-7. **백업 (`pg_dump`)**
+### 업데이트
 
-   ```bash
-   # 백업
-   docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > manito-$(date +%F).sql
-   # 복원 (빈 DB에)
-   docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < manito-2026-01-01.sql
-   ```
+- 방법 A: `git pull && docker compose up -d --build`
+- 방법 B: 새 태그로 이미지를 빌드해 전송하고, `docker-compose.override.yml`의 태그를 바꾼 뒤 `docker compose up -d --no-build`
 
-   cron으로 매일 실행하고 서버 밖(오브젝트 스토리지 등)에 사본을 보관하세요.
+### 백업
 
-업데이트는 `git pull && docker compose up -d --build` 입니다.
+```bash
+# 백업
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > manito-$(date +%F).sql
+# 복원 (빈 DB에)
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < manito-2026-01-01.sql
+```
+
+이벤트 기간에는 cron으로 매일 실행하고 서버 밖에 사본을 보관하세요.
+
+## 프로젝트 구조
+
+```
+src/
+  app/              화면과 Server Action (Next.js App Router)
+    new/            이벤트 개설
+    dev/            둘러보기 화면 (개발 서버에서만 열림)
+    e/[code]/       이벤트 홈(피드), duty(내 임무), rank(순위),
+                    settings(개설자 설정), present(발표), result(결과)
+  domain/           규칙이 모여 있는 곳: 배정, 기록, 판정, 미션, 포인트, 발표
+    views.ts        "보는 사람 기준" 조회. 화면에 내려가는 데이터는 여기서 걸러집니다
+    constants.ts    포인트, 온도, PIN 잠금 같은 조정 가능한 값
+  db/               Drizzle 스키마와 DB 연결
+  dev/              개발 서버 전용: 내장 DB 준비, 샘플 데이터, 둘러보기 화면 데이터
+  lib/              세션, 액션 래퍼, 표시 형식
+  instrumentation.ts  서버 시작 시 마이그레이션 적용 (개발 서버에서는 샘플 준비)
+drizzle/            마이그레이션 SQL
+scripts/            샘플 이벤트 추가 스크립트
+docs/               설계 문서와 구현 계획
+```
+
+화면(`src/app`)은 DB 스키마를 직접 읽지 않고 `src/domain`의 함수만 호출합니다. 비밀 정보가 화면으로 새지 않게 하는 경계이므로 유지해 주세요.
+
+## 기여하기
+
+이슈와 Pull Request를 환영합니다. 큰 변경은 먼저 이슈로 방향을 이야기해 주세요.
+
+- 규칙을 바꾸는 변경에는 `src/domain`에 테스트를 함께 넣어 주세요.
+- PR을 올리기 전에 `yarn test`, `yarn lint`, `yarn tsc --noEmit`이 통과하는지 확인해 주세요.
+- 스키마를 바꿨다면 `yarn db:generate`로 만든 마이그레이션을 함께 커밋해 주세요.
+- 이 서비스에서 가장 중요한 것은 **발표 전에 배정과 판정 결과가 새지 않는 것**입니다. 화면, 응답 데이터, 오류 메시지, 점수가 오르는 시점 어느 쪽으로도 드러나지 않는지 살펴 주세요.
+- 이 프로젝트의 Next.js는 최신 버전이라 익숙한 API와 다를 수 있습니다. 코드를 쓰기 전에 `node_modules/next/dist/docs/`의 문서를 확인하세요([AGENTS.md](AGENTS.md) 참고).
+
+## 보안
+
+배정이나 판정 결과가 노출되는 문제, 인증 우회 같은 취약점은 공개 이슈로 올리지 말고 GitHub의 [비공개 취약점 신고](https://github.com/park-gwimong/manito-web/security/advisories/new)로 알려 주세요.
+
+## 라이선스
+
+[MIT](LICENSE)

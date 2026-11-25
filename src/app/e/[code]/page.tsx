@@ -15,6 +15,8 @@ import { JoinForm } from "./_components/JoinForm";
 import { Lobby } from "./_components/Lobby";
 import { LoginForm } from "./_components/LoginForm";
 import { PinResetTrace } from "./_components/PinResetTrace";
+import { PushToggle } from "./_components/PushToggle";
+import { pushPublicKey } from "@/lib/push";
 import { RecordForm } from "./_components/RecordForm";
 
 const STATUS_LABEL = {
@@ -43,7 +45,7 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
           <>
             <JoinForm code={event.code} />
             {candidates.length > 0 && (
-              <details className="group rounded-card border-2 border-dashed border-line px-5 py-4">
+              <details className="group rounded-card border border-dashed border-line px-5 py-4">
                 <summary className="cursor-pointer list-none font-semibold text-berry-deep">
                   이미 입장했어요
                   <span className="ml-1 inline-block transition group-open:rotate-90" aria-hidden="true">
@@ -96,7 +98,9 @@ export default async function EventPage({ params }: PageProps<"/e/[code]">) {
       {/* 마감 뒤에도 "발표 시작 → 추측 잠김"과 결과 공개를 새로고침 없이 받는다. */}
       {closed && <AutoRefresh intervalMs={30_000} />}
       <Header eventName={event.name} temperature={header.temperature} dday={header.dday} />
+      <h1 className="hidden font-display text-3xl leading-tight text-ink lg:block">모두의 기록</h1>
       {trace && <PinResetTrace resetAtLabel={formatKst(trace.resetAt)} />}
+      {(active || closed) && <PushToggle code={event.code} publicKey={pushPublicKey()} hideWhenOn />}
       {active && <RecordForm code={event.code} />}
       {closed && (
         <>

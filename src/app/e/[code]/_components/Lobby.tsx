@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, Screen } from "../../../_components/ui";
+import { StartNowButton } from "./OrganizerControls";
 import { PinResetTrace } from "./PinResetTrace";
 
 type Props = {
@@ -53,6 +54,18 @@ export function Lobby(props: Props) {
 
       <InviteTicket code={props.code} />
 
+      {props.isOrganizer && !props.startMissed && (
+        <Link
+          href={`/e/${props.code}/settings`}
+          className="flex min-h-12 items-center justify-between rounded-field border border-line bg-card px-4 font-semibold text-ink shadow-lift"
+        >
+          일정과 미션 고치기
+          <span className="text-sm font-medium text-ink-soft">설정으로 가기</span>
+        </Link>
+      )}
+
+      {props.isOrganizer && <StartNowButton code={props.code} count={count} min={props.minParticipants} />}
+
       <Card className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between">
           <h2 className="font-display text-xl">입장한 사람</h2>
@@ -62,7 +75,7 @@ export function Lobby(props: Props) {
           {props.participants.map((p) => (
             <li
               key={p.id}
-              className={`rounded-pill border-2 px-3.5 py-1.5 text-sm font-medium ${
+              className={`rounded-pill border px-3.5 py-1.5 text-sm font-medium ${
                 p.id === props.meId ? "border-sun bg-sun-tint" : "border-line bg-paper"
               }`}
             >
@@ -104,7 +117,7 @@ function InviteTicket({ code }: { code: string }) {
       <span aria-hidden="true" className="absolute top-1/2 -right-3 h-6 w-6 -translate-y-1/2 rounded-full bg-paper" />
       <p className="text-sm text-white/80">초대 코드</p>
       <p className="font-display text-4xl tracking-[0.15em] text-sun">{code}</p>
-      <div className="my-4 border-t-2 border-dashed border-white/30" />
+      <div className="my-4 border-t border-dashed border-white/30" />
       <Button type="button" variant="soft" onClick={copy} className="w-full" aria-live="polite">
         {copied ? "링크를 복사했어요" : "초대 링크 복사하기"}
       </Button>

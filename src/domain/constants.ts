@@ -1,4 +1,6 @@
 export const MIN_PARTICIPANTS = 4;
+/** 진행 중에 참가자를 내보낸 뒤에도 남아 있어야 하는 인원. 둘이면 서로가 서로의 마니또라 비밀이 없다. */
+export const MIN_ACTIVE_PARTICIPANTS = 3;
 export const RECORD_POINTS = 10;
 export const RECORD_DAILY_CAP = 3;
 export const MISSION_POINTS = 10;

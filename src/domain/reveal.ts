@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { DomainError } from "./errors";
 import { advanceEvent } from "./lifecycle";
+import { enqueue } from "./notifications";
 import { finalScores, temperature, type FinalScore } from "./scoring";
 
 export type RevealData = {
@@ -92,6 +93,16 @@ export async function startPresentation(db: Db, organizerId: string, now: Date):
   if (updated.length === 0) {
     throw new DomainError("NOT_CLOSED", "마감된 모임에서만 발표를 시작할 수 있어요.");
   }
+  const members = await db
+    .select({ id: participants.id })
+    .from(participants)
+    .where(eq(participants.eventId, me.eventId));
+  await enqueue(
+    db,
+    me.eventId,
+    members.filter((m) => m.id !== me.id).map((m) => m.id),
+    "presentation",
+  );
 }
 
 export async function finishPresentation(db: Db, organizerId: string, now: Date): Promise<void> {

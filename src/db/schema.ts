@@ -49,6 +49,8 @@ export const assignments = pgTable("assignments", {
   eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
   giverId: uuid("giver_id").notNull().unique().references(() => participants.id, { onDelete: "cascade" }),
   receiverId: uuid("receiver_id").notNull().unique().references(() => participants.id, { onDelete: "cascade" }),
+  /** 진행 중에 참가자가 빠져 대상이 바뀐 시각. 처음 배정 그대로면 null. */
+  reassignedAt: tz("reassigned_at"),
 });
 
 export const records = pgTable("records", {
@@ -108,6 +110,32 @@ export const guesses = pgTable("guesses", {
   participantId: uuid("participant_id").primaryKey().references(() => participants.id, { onDelete: "cascade" }),
   guessedId: uuid("guessed_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
 });
+
+export const NOTIFICATION_KINDS = ["started", "mission", "record", "closed", "presentation", "reassigned"] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+/** 보낼 알림을 쌓아 두는 곳. 도메인이 일이 생긴 그 트랜잭션에서 넣고, 보내는 쪽이 꺼내 가며 지운다. */
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  participantId: uuid("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: NOTIFICATION_KINDS }).notNull(),
+  createdAt: tz("created_at").notNull().defaultNow(),
+});
+
+/** 참가자가 알림을 켠 브라우저. 한 브라우저가 여러 이벤트에 쓰일 수 있어 (참가자, 주소) 쌍이 고유하다. */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    participantId: uuid("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: tz("created_at").notNull().defaultNow(),
+  },
+  (t) => [unique("push_subscriptions_participant_endpoint_unique").on(t.participantId, t.endpoint)],
+);
 
 export type Event = typeof events.$inferSelect;
 export type Participant = typeof participants.$inferSelect;

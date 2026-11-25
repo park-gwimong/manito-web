@@ -1,48 +1,140 @@
 @import "tailwindcss";
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
 /*
- * 마니또 디자인 토큰 — "편지지와 스티커".
- * 블러시 빛 편지지 위에 자두색 잉크, 노란 스티커 하이라이트.
+ * 마니또 디자인 토큰.
+ * 따뜻한 중성색 바탕 위에 자두색(berry) 하나와 노란 스티커(sun) 하나만 쓴다.
+ * 여기 적힌 값은 밝은 화면용이고, 어두운 화면용 값은 아래 :root 덮어쓰기에 있다.
  * Tailwind 유틸리티 이름: bg-paper, text-ink, bg-berry, bg-sun, border-line, rounded-card …
  */
 @theme {
-  --color-paper: #fff5f1;
-  --color-paper-deep: #fde7df;
+  --color-paper: #faf6f4;
+  --color-paper-deep: #f1e7e3;
   --color-card: #ffffff;
-  --color-ink: #2a2238;
-  --color-ink-soft: #6c6380;
-  --color-line: #efd9d0;
-  --color-berry: #8a2f6f;
+  --color-ink: #1f1a2b;
+  --color-ink-soft: #6a6279;
+  --color-line: #ece2de;
+  --color-berry: #96297a;
+  /* berry-tint 위에 올리는 글자색. 어두운 화면에서는 밝은 분홍이 된다. */
   --color-berry-deep: #6d2357;
-  --color-berry-tint: #f6e4ef;
+  --color-berry-tint: #f7e6f1;
   --color-sun: #ffcf4a;
   --color-sun-tint: #fff3c9;
+  /* 노란 스티커 위의 글자. 화면 밝기와 상관없이 항상 어둡다. */
+  --color-sun-ink: #2a2238;
   --color-danger: #b8322a;
   --color-danger-tint: #fdecea;
 
-  --radius-field: 0.875rem;
-  --radius-card: 1.5rem;
+  --radius-field: 1rem;
+  --radius-card: 1.75rem;
   --radius-pill: 999px;
 
-  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
-  --font-display: var(--font-jua), "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
+    "Noto Sans KR", system-ui, sans-serif;
+  --font-display: var(--font-sans);
 
-  --shadow-lift: 0 2px 0 0 var(--color-line);
+  --shadow-lift: 0 1px 1px rgb(31 26 43 / 0.04), 0 10px 30px -14px rgb(31 26 43 / 0.16);
+  --shadow-glow: 0 10px 24px -10px var(--color-berry);
 }
 
 :root {
+  color-scheme: light dark;
+}
+
+/* 기기가 어두운 화면으로 설정돼 있으면 같은 이름의 색을 어두운 값으로 바꾼다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #14111a;
+    --color-paper-deep: #241e2e;
+    --color-card: #1d1926;
+    --color-ink: #f4eff8;
+    --color-ink-soft: #aaa2ba;
+    --color-line: #322b3f;
+    --color-berry: #bd4898;
+    --color-berry-deep: #f3b9de;
+    --color-berry-tint: #3a2136;
+    --color-sun-tint: #3a3013;
+    --color-danger: #ff8f85;
+    --color-danger-tint: #3d1c1a;
+    --shadow-lift: 0 1px 1px rgb(0 0 0 / 0.3), 0 10px 30px -14px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* 발표 화면처럼 항상 밝은 색으로 그려야 하는 영역에 붙인다. */
+.theme-light {
   color-scheme: light;
+  --color-paper: #faf6f4;
+  --color-paper-deep: #f1e7e3;
+  --color-card: #ffffff;
+  --color-ink: #1f1a2b;
+  --color-ink-soft: #6a6279;
+  --color-line: #ece2de;
+  --color-berry: #96297a;
+  --color-berry-deep: #6d2357;
+  --color-berry-tint: #f7e6f1;
+  --color-sun-tint: #fff3c9;
+  --color-danger: #b8322a;
+  --color-danger-tint: #fdecea;
 }
 
 body {
-  background: var(--color-paper);
+  /* 위쪽 모서리에서 번지는 두 가지 빛. 화면을 내려도 제자리에 머문다. */
+  background:
+    radial-gradient(56rem 34rem at 0% -8%, color-mix(in oklab, var(--color-berry) 13%, transparent), transparent 62%),
+    radial-gradient(44rem 30rem at 100% -4%, color-mix(in oklab, var(--color-sun) 20%, transparent), transparent 60%),
+    var(--color-paper);
+  background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-feature-settings: "ss06", "tnum";
+  letter-spacing: -0.01em;
   -webkit-tap-highlight-color: transparent;
   word-break: keep-all;
+}
+
+@layer utilities {
+  /* 제목 글씨: 같은 글꼴을 굵고 촘촘하게. */
+  .font-display {
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+  /* 반투명 유리판. 떠 있는 메뉴와 레일에 쓴다. */
+  .glass {
+    background-color: color-mix(in oklab, var(--color-card) 86%, transparent);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  }
+}
+
+::selection {
+  background: var(--color-sun);
+  color: var(--color-sun-ink);
 }
 
 :focus-visible {
   outline: 3px solid var(--color-sun);
   outline-offset: 2px;
+}
+
+/* 온도계 눈금이 차오르는 한 번의 움직임. 움직임을 줄이도록 설정한 사람에게는 보여 주지 않는다. */
+@keyframes mercury-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes mercury-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mercury-v {
+    transform-origin: bottom;
+    animation: mercury-rise 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .mercury-h {
+    transform-origin: left;
+    animation: mercury-grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
 }

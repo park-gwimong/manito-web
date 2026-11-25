@@ -8,7 +8,7 @@ import { joinEvent } from "./participants";
 import { advanceEvent, getGiverIdOf, getTargetOf } from "./lifecycle";
 import { addSecretDeed, createRecord, setVerdict, toggleReaction } from "./records";
 import { completeMission } from "./missions";
-import { getDuty, getFeed, getHeader, getLobby, getRanking } from "./views";
+import { getDuty, getDutyBadge, getFeed, getHeader, getLobby, getRanking } from "./views";
 
 const now = new Date("2026-11-24T00:00:00Z");
 const days = (d: number) => new Date(now.getTime() + d * 86_400_000);
@@ -43,24 +43,43 @@ async function cast(members: Participant[]) {
   return { a, b, c };
 }
 
-test("마니또 A의 피드: r에 judge.myVerdict === true", async () => {
+test("마니또 A의 내 임무: r에 judge.myVerdict === true, 홈 피드에는 judge가 없다", async () => {
   const { event, members } = await setup();
   const { a, b } = await cast(members);
   const r = await createRecord(db, b.id, "기록", during);
   await setVerdict(db, a.id, r.id, true, during);
-  const [item] = await getFeed(db, event.id, a.id);
+  const [item] = (await getDuty(db, event.id, a.id))!.targetRecords;
   expect(item.judge).toEqual({ myVerdict: true });
   expect(item.verdictStatus).toBe("done");
   expect(item.isMine).toBe(false);
+  // 홈 피드는 옆 사람이 볼 수 있으므로 마니또 본인에게도 판정 질문을 싣지 않는다.
+  const [home] = await getFeed(db, event.id, a.id);
+  expect("judge" in home).toBe(false);
+  expect(home.verdictStatus).toBe("done");
 });
 
-test("판정 전 마니또의 피드는 judge.myVerdict null, verdictStatus pending", async () => {
+test("판정 전 마니또의 내 임무는 judge.myVerdict null, verdictStatus pending", async () => {
   const { event, members } = await setup();
   const { a, b } = await cast(members);
   await createRecord(db, b.id, "기록", during);
-  const [item] = await getFeed(db, event.id, a.id);
+  const [item] = (await getDuty(db, event.id, a.id))!.targetRecords;
   expect(item.judge).toEqual({ myVerdict: null });
   expect(item.verdictStatus).toBe("pending");
+});
+
+test("내 임무 배지: 완료 안 한 미션 + 답하지 않은 대상 기록 수", async () => {
+  const { event, members } = await setup();
+  const { a, b, c } = await cast(members);
+  const base = await getDutyBadge(db, event.id, a.id);
+  const r = await createRecord(db, b.id, "기록", during);
+  await createRecord(db, c.id, "남의 기록", during);
+  expect(await getDutyBadge(db, event.id, a.id)).toBe(base + 1);
+  await setVerdict(db, a.id, r.id, false, during);
+  expect(await getDutyBadge(db, event.id, a.id)).toBe(base);
+  const mine = await db.select().from(missionDeliveries).where(eq(missionDeliveries.participantId, a.id));
+  expect(base).toBe(mine.length);
+  await completeMission(db, a.id, mine[0].id, during);
+  expect(await getDutyBadge(db, event.id, a.id)).toBe(base - 1);
 });
 
 test("작성자 B의 피드: r에 judge 키가 없고 result 키도 없다", async () => {

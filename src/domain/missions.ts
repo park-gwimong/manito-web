@@ -10,6 +10,7 @@ import {
 import { BODY_MAX } from "./constants";
 import { DomainError } from "./errors";
 import { advanceEvent } from "./lifecycle";
+import { enqueue } from "./notifications";
 
 /** 슬롯 시각: startsAt + slotIndex × (endsAt − startsAt) / missionCount. 0번 슬롯은 시작 시각. */
 export function slotTime(
@@ -74,7 +75,20 @@ export async function deliverDueMissions(
         });
       }
     }
-    if (rows.length > 0) await tx.insert(missionDeliveries).values(rows).onConflictDoNothing();
+    if (rows.length === 0) return;
+    const inserted = await tx
+      .insert(missionDeliveries)
+      .values(rows)
+      .onConflictDoNothing()
+      .returning({ participantId: missionDeliveries.participantId, slotIndex: missionDeliveries.slotIndex });
+    // 첫 미션은 시작 알림과 겹치고, 종료 뒤에 몰아서 배달된 미션은 할 수 없으니 알리지 않는다.
+    if (now.getTime() >= event.endsAt.getTime()) return;
+    await enqueue(
+      tx,
+      event.id,
+      inserted.filter((r) => r.slotIndex > 0).map((r) => r.participantId),
+      "mission",
+    );
   });
 }
 

@@ -12,3 +12,4 @@ docker-compose*.yml
 tsconfig.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
+.local

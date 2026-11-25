@@ -5,8 +5,8 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react
 type ButtonVariant = "primary" | "soft" | "ghost";
 
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
-  primary: "bg-berry text-white shadow-[0_3px_0_0_var(--color-berry-deep)] active:translate-y-[2px] active:shadow-none",
-  soft: "bg-berry-tint text-berry-deep active:bg-paper-deep",
+  primary: "bg-berry text-white shadow-glow transition hover:brightness-110 active:scale-[0.97]",
+  soft: "bg-berry-tint text-berry-deep hover:brightness-95 active:scale-[0.97]",
   ghost: "text-ink-soft underline underline-offset-4 active:text-ink",
 };
 
@@ -34,7 +34,7 @@ export function Field({
       <span className="text-sm font-semibold text-ink">{label}</span>
       <input
         {...props}
-        className={`min-h-12 rounded-field border-2 border-line bg-card px-4 text-base text-ink placeholder:text-ink-soft/60 focus:border-berry focus:outline-none ${className}`}
+        className={`min-h-13 rounded-field border border-line bg-card px-4 text-base text-ink transition placeholder:text-ink-soft/60 focus:border-berry focus:ring-4 focus:ring-berry/15 focus:outline-none ${className}`}
       />
       {hint && <span className="text-xs text-ink-soft">{hint}</span>}
     </label>
@@ -63,7 +63,19 @@ export function PinField(props: { label?: string; name: string; hint?: string; a
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-card border-2 border-line bg-card p-5 shadow-lift ${className}`}>{children}</section>
+    <section className={`rounded-card border border-line bg-card p-5 shadow-lift ${className}`}>{children}</section>
+  );
+}
+
+/** 고칠 곳이 여러 개일 때 한 번에 보여 주는 목록. */
+export function ProblemList({ problems }: { problems: string[] }) {
+  if (problems.length === 0) return null;
+  return (
+    <ul role="alert" className="flex list-disc flex-col gap-1 rounded-field bg-danger-tint py-3 pr-4 pl-8 text-sm font-medium text-danger">
+      {problems.map((p) => (
+        <li key={p}>{p}</li>
+      ))}
+    </ul>
   );
 }
 
@@ -78,5 +90,37 @@ export function ErrorText({ children }: { children?: ReactNode }) {
 
 /** 모바일 한 손 조작용 화면 틀. 가운데 좁은 기둥, 본문은 왼쪽 정렬. */
 export function Screen({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <main className={`mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-8 pb-28 ${className}`}>{children}</main>;
+  return <main className={`mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-8 pb-28 lg:max-w-xl lg:pt-12 lg:pb-16 ${className}`}>{children}</main>;
+}
+
+// 사람마다 다른 색 스티커. 이름으로 정해지므로 어느 화면에서나 같은 색이다.
+const STICKER_COLORS = [
+  { bg: "#f6e4ef", fg: "#6d2357" },
+  { bg: "#fff3c9", fg: "#6b4e00" },
+  { bg: "#dff3ea", fg: "#1f5c45" },
+  { bg: "#e1eefb", fg: "#1f4a7a" },
+  { bg: "#ffe3d3", fg: "#8a3b12" },
+  { bg: "#e9e4fb", fg: "#44358a" },
+];
+
+/** 이름 첫 글자를 담은 동그란 스티커. 장식이라 스크린리더에는 읽히지 않는다(옆에 이름이 있다). */
+export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) % 997;
+  const color = STICKER_COLORS[hash % STICKER_COLORS.length];
+  const box = size === "lg" ? "h-14 w-14 text-2xl" : size === "sm" ? "h-8 w-8 text-sm" : "h-10 w-10 text-lg";
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex shrink-0 items-center justify-center rounded-full font-display ${box}`}
+      style={{ backgroundColor: color.bg, color: color.fg }}
+    >
+      {Array.from(name.trim())[0] ?? "?"}
+    </span>
+  );
+}
+
+/** 화면 안의 구역 제목. */
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return <h2 className="font-display text-xl text-ink">{children}</h2>;
 }

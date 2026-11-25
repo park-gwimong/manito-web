@@ -30,8 +30,9 @@ export function JudgeButtons({
   ];
 
   return (
-    <div className="flex flex-col gap-2 rounded-field bg-sun-tint px-4 py-3">
+    <div className="flex flex-col gap-2 rounded-field border border-dashed border-sun bg-sun-tint px-4 py-3">
       <p className="text-sm font-semibold text-ink">이 기록, 내가 몰래 한 일이 맞나요?</p>
+      <p className="-mt-1 text-xs text-ink-soft">나에게만 보이는 질문이에요. 답은 발표 때 공개돼요.</p>
       <div className="flex gap-2">
         {options.map((o) => (
           <button
@@ -40,7 +41,7 @@ export function JudgeButtons({
             disabled={pending}
             aria-pressed={myVerdict === o.value}
             onClick={() => choose(o.value)}
-            className={`min-h-11 flex-1 rounded-pill border-2 px-3 text-sm font-semibold transition disabled:opacity-60 ${
+            className={`min-h-11 flex-1 rounded-pill border px-3 text-sm font-semibold transition disabled:opacity-60 ${
               myVerdict === o.value ? "border-berry bg-berry text-white" : "border-line bg-card text-ink"
             }`}
           >

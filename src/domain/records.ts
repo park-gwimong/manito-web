@@ -4,6 +4,7 @@ import { participants, reactions, records, secretDeeds, verdicts, type Participa
 import { BODY_MAX, REACTION_EMOJIS } from "./constants";
 import { DomainError } from "./errors";
 import { advanceEvent, getGiverIdOf } from "./lifecycle";
+import { enqueue } from "./notifications";
 
 function validateBody(body: string): string {
   const trimmed = body.trim();
@@ -53,6 +54,9 @@ export async function createRecord(
     .insert(records)
     .values({ eventId: author.eventId, authorId, body: text, createdAt: now, updatedAt: now })
     .returning({ id: records.id });
+  // 글쓴이의 마니또에게만 알린다. 알림 글귀에는 이름을 넣지 않는다.
+  const giverId = await getGiverIdOf(db, authorId);
+  if (giverId) await enqueue(db, author.eventId, [giverId], "record");
   return row;
 }
 

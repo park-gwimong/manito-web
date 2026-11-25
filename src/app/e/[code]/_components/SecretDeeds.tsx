@@ -49,7 +49,7 @@ export function SecretDeeds({
           rows={2}
           aria-label="몰래 한 일"
           placeholder="상대가 모르게 챙겨 준 일을 적어 두세요"
-          className="rounded-field border-2 border-line bg-card px-4 py-3 text-base text-ink placeholder:text-ink-soft/60 focus:border-berry focus:outline-none"
+          className="rounded-field border border-line bg-card px-4 py-3 text-base text-ink placeholder:text-ink-soft/60 focus:border-berry focus:ring-4 focus:ring-berry/15 focus:outline-none"
         />
         <Button type="submit" variant="soft" disabled={pending || body.trim() === ""}>
           메모 남기기

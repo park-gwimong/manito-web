@@ -48,7 +48,7 @@ export function GuessForm({ code, candidates, initialGuessId, locked }: Props) {
               {candidates.map((c) => (
                 <label
                   key={c.id}
-                  className="flex min-h-11 cursor-pointer items-center rounded-pill border-2 border-line bg-card px-4 font-medium has-checked:border-berry has-checked:bg-berry has-checked:text-white has-focus-visible:outline-3 has-focus-visible:outline-sun"
+                  className="flex min-h-11 cursor-pointer items-center rounded-pill border border-line bg-card px-4 font-medium has-checked:border-berry has-checked:bg-berry has-checked:text-white has-focus-visible:outline-3 has-focus-visible:outline-sun"
                 >
                   <input
                     type="radio"

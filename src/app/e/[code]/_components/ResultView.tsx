@@ -77,7 +77,7 @@ export function ResultView({ data, meId }: { data: RevealData; meId: string }) {
                 <p className="text-sm font-semibold">{c.giver.name}이(가) 몰래 한 일</p>
                 <ul className="flex flex-col gap-1.5">
                   {c.unnoticedDeeds.map((d, i) => (
-                    <li key={i} className="rounded-field border-2 border-dashed border-line px-3 py-2 text-sm leading-relaxed">
+                    <li key={i} className="rounded-field border border-dashed border-line px-3 py-2 text-sm leading-relaxed">
                       {d.body}
                     </li>
                   ))}

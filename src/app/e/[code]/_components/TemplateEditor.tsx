@@ -42,7 +42,7 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 rows={2}
-                className="rounded-field border-2 border-line bg-card px-4 py-3 focus:border-berry focus:outline-none"
+                className="rounded-field border border-line bg-card px-4 py-3 focus:border-berry focus:ring-4 focus:ring-berry/15 focus:outline-none"
               />
               <div className="flex gap-2">
                 <Button
@@ -102,7 +102,7 @@ export function TemplateEditor({ code, templates }: { code: string; templates: T
           value={newBody}
           onChange={(e) => setNewBody(e.target.value)}
           placeholder="예: 오늘 커피 한 잔 챙겨 주기"
-          className="min-h-12 rounded-field border-2 border-line bg-card px-4 focus:border-berry focus:outline-none"
+          className="min-h-12 rounded-field border border-line bg-card px-4 focus:border-berry focus:ring-4 focus:ring-berry/15 focus:outline-none"
         />
         <Button type="submit" variant="soft" disabled={pending || newBody.trim() === ""}>
           추가하기
