@@ -9,7 +9,7 @@ import type { Db } from "../db/client";
 import { events, type Event, type Participant } from "../db/schema";
 import { createEvent } from "../domain/events";
 import { advanceEvent, getGiverIdOf } from "../domain/lifecycle";
-import { completeMission } from "../domain/missions";
+import { chooseMission, completeMission } from "../domain/missions";
 import { joinEvent } from "../domain/participants";
 import { addSecretDeed, createRecord, setVerdict, toggleReaction } from "../domain/records";
 import { finishPresentation, setGuess, startPresentation } from "../domain/reveal";
@@ -131,6 +131,12 @@ export async function seedDemo(db: Db, stage: DemoStage): Promise<{ event: Event
       const duty = await getDuty(db, event.id, m.id);
       for (const [k, mission] of (duty?.missions ?? []).entries()) {
         if ((i + k) % 3 === 2) continue;
+        const doneAt = at(Math.min(mission.deliveredAt.getTime() + 3 * HOUR, limit));
+        // 고르는 미션은 하나를 고른다. 가장 최근 것 일부는 고르지 않은 채로 두어 고르는 화면을 볼 수 있게 한다.
+        if (mission.body === null && mission.options) {
+          if (k === duty!.missions.length - 1 && i % 2 === 0) continue;
+          await chooseMission(db, m.id, mission.id, mission.options[(i + k) % mission.options.length], doneAt);
+        }
         await completeMission(db, m.id, mission.id, at(Math.min(mission.deliveredAt.getTime() + 3 * HOUR, limit)));
       }
     }

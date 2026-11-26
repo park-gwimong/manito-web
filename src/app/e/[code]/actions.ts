@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { getDb } from "@/db/client";
 import { updateEventSettings } from "@/domain/events";
-import { addTemplate, completeMission, deleteTemplate, updateTemplate } from "@/domain/missions";
+import { addTemplate, chooseMission, completeMission,deleteTemplate, updateTemplate } from "@/domain/missions";
 import {
   acknowledgePinReset,
   joinEvent,
@@ -120,6 +120,13 @@ export async function completeMissionAction(code: string, deliveryId: string): P
   return act(async () => {
     const { me } = await requireMe(str(code));
     await completeMission(getDb(), me.id, str(deliveryId), new Date());
+  });
+}
+
+export async function chooseMissionAction(code: string, deliveryId: string, body: string): Promise<ActionResult> {
+  return act(async () => {
+    const { me } = await requireMe(str(code));
+    await chooseMission(getDb(), me.id, str(deliveryId), str(body), new Date());
   });
 }
 

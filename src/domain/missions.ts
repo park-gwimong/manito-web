@@ -10,8 +10,21 @@ import {
 import { BODY_MAX } from "./constants";
 import { DomainError } from "./errors";
 import { advanceEvent } from "./lifecycle";
-import { slotTimes, type MissionPlan } from "./mission-plan";
+import { MISSION_CHOICES, slotTimes, type MissionPlan } from "./mission-plan";
 import { enqueue } from "./notifications";
+
+/** 목록에서 서로 다른 본문을 `count`개까지 고른다. 아직 받아 보지 않은 것을 먼저 쓴다. */
+function pickBodies(all: string[], received: Set<string>, count: number, rng: () => number): string[] {
+  const unique = [...new Set(all)];
+  const picks: string[] = [];
+  while (picks.length < Math.min(count, unique.length)) {
+    const left = unique.filter((b) => !picks.includes(b));
+    const fresh = left.filter((b) => !received.has(b));
+    const pool = fresh.length > 0 ? fresh : left;
+    picks.push(pool[Math.min(Math.floor(rng() * pool.length), pool.length - 1)]);
+  }
+  return picks;
+}
 
 /** 슬롯(몇 번째 미션)의 도착 시각. 규칙은 `mission-plan.ts`에 있다. 방식을 생략하면 custom으로 본다. */
 export function slotTime(
@@ -49,25 +62,30 @@ export async function deliverDueMissions(
         participantId: missionDeliveries.participantId,
         slotIndex: missionDeliveries.slotIndex,
         body: missionDeliveries.body,
+        options: missionDeliveries.options,
       })
       .from(missionDeliveries)
       .where(eq(missionDeliveries.eventId, event.id));
 
+    // 매일 방식에서는 안을 여러 개 보내고 받은 사람이 하나를 고른다.
+    const perSlot = event.missionMode === "daily" ? MISSION_CHOICES : 1;
+    const bodies = templates.map((t) => t.body);
     const rows: (typeof missionDeliveries.$inferInsert)[] = [];
     for (const member of members) {
       const mine = existing.filter((d) => d.participantId === member.id);
       const doneSlots = new Set(mine.map((d) => d.slotIndex));
-      const received = new Set(mine.map((d) => d.body));
+      // 고르지 않은 안도 한 번 본 것이니 다음에는 다른 미션을 보여 준다.
+      const received = new Set(mine.flatMap((d) => [...(d.options ?? []), ...(d.body === null ? [] : [d.body])]));
       for (const slotIndex of dueSlots) {
         if (doneSlots.has(slotIndex)) continue;
-        const fresh = templates.filter((t) => !received.has(t.body));
-        const pool = fresh.length > 0 ? fresh : templates;
-        const body = pool[Math.min(Math.floor(rng() * pool.length), pool.length - 1)].body;
-        received.add(body);
+        const picks = pickBodies(bodies, received, perSlot, rng);
+        for (const body of picks) received.add(body);
+        const choice = picks.length > 1;
         rows.push({
           eventId: event.id,
           participantId: member.id,
-          body,
+          body: choice ? null : picks[0],
+          options: choice ? picks : null,
           slotIndex,
           deliveredAt: times[slotIndex],
         });
@@ -90,12 +108,8 @@ export async function deliverDueMissions(
   });
 }
 
-export async function completeMission(
-  db: Db,
-  participantId: string,
-  deliveryId: string,
-  now: Date,
-): Promise<void> {
+/** 내게 온 배달인지, 진행 중인지 확인하고 돌려준다. */
+async function loadMyDelivery(db: Db, participantId: string, deliveryId: string, now: Date) {
   const [participant] = await db.select().from(participants).where(eq(participants.id, participantId));
   if (!participant) throw new DomainError("PARTICIPANT_NOT_FOUND", "참가자를 찾을 수 없어요.");
   const event = await advanceEvent(db, participant.eventId, now);
@@ -105,10 +119,45 @@ export async function completeMission(
     .from(missionDeliveries)
     .where(eq(missionDeliveries.id, deliveryId));
   if (!delivery || delivery.participantId !== participantId) {
-    throw new DomainError("NOT_YOURS", "내게 온 미션만 완료할 수 있어요.");
+    throw new DomainError("NOT_YOURS", "내게 온 미션만 할 수 있어요.");
   }
   if (event.status !== "active") {
-    throw new DomainError("NOT_ACTIVE", "진행 중일 때만 미션을 완료할 수 있어요.");
+    throw new DomainError("NOT_ACTIVE", "진행 중일 때만 할 수 있어요.");
+  }
+  return delivery;
+}
+
+/** 받은 안 중 하나를 고른다. 완료하기 전에는 다른 안으로 바꿀 수 있다. */
+export async function chooseMission(
+  db: Db,
+  participantId: string,
+  deliveryId: string,
+  body: string,
+  now: Date,
+): Promise<void> {
+  const delivery = await loadMyDelivery(db, participantId, deliveryId, now);
+  if (!delivery.options?.includes(body)) {
+    throw new DomainError("NOT_AN_OPTION", "받은 미션 중에서 골라 주세요.");
+  }
+  const changed = await db
+    .update(missionDeliveries)
+    .set({ body })
+    .where(and(eq(missionDeliveries.id, deliveryId), isNull(missionDeliveries.completedAt)))
+    .returning({ id: missionDeliveries.id });
+  if (changed.length === 0) {
+    throw new DomainError("ALREADY_COMPLETED", "완료한 미션은 바꿀 수 없어요.");
+  }
+}
+
+export async function completeMission(
+  db: Db,
+  participantId: string,
+  deliveryId: string,
+  now: Date,
+): Promise<void> {
+  const delivery = await loadMyDelivery(db, participantId, deliveryId, now);
+  if (delivery.body === null) {
+    throw new DomainError("NOT_CHOSEN", "할 미션을 먼저 골라 주세요.");
   }
   await db
     .update(missionDeliveries)

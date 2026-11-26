@@ -37,7 +37,8 @@ export type Duty = {
   target: { id: string; name: string };
   /** 진행 중에 참가자가 빠져 대상이 바뀌었는지. */
   reassigned: boolean;
-  missions: { id: string; body: string; deliveredAt: Date; completed: boolean }[];
+  /** `options`가 있으면 그중 하나를 골라서 하는 미션이다. 고르기 전에는 `body`가 null. */
+  missions: { id: string; body: string | null; options: string[] | null; deliveredAt: Date; completed: boolean }[];
   targetRecords: FeedItem[];
   secretDeeds: { id: string; body: string; createdAt: Date }[];
 };
@@ -195,6 +196,7 @@ export async function getDuty(db: Db, eventId: string, viewerId: string): Promis
     missions: missionRows.map((m) => ({
       id: m.id,
       body: m.body,
+      options: m.options,
       deliveredAt: m.deliveredAt,
       completed: m.completedAt !== null,
     })),

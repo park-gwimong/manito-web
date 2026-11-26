@@ -6,7 +6,7 @@ import { events, missionDeliveries, type Participant } from "@/db/schema";
 import { createEvent, updateEventSettings } from "./events";
 import { advanceEvent, changeEndsAt, startNow } from "./lifecycle";
 import type { MissionMode } from "./mission-plan";
-import { deleteTemplate, listTemplates } from "./missions";
+import { chooseMission, completeMission, deleteTemplate, listTemplates } from "./missions";
 import { joinEvent } from "./participants";
 
 const kst = (s: string) => new Date(`${s}:00+09:00`);
@@ -51,7 +51,51 @@ test("매일 방식: 개수는 일정에서 정해지고, 매일 정한 시각�
   const got = await mine(event.id, members[1].id);
   expect(got).toHaveLength(2);
   expect(got[1].deliveredAt).toEqual(kst("2026-12-02T08:00"));
-  expect(new Set(got.map((d) => d.body)).size).toBe(2);
+  // 날마다 안 세 개가 오고, 이틀 동안 본 여섯 개는 서로 다르다.
+  expect(got.map((d) => d.body)).toEqual([null, null]);
+  expect(got.map((d) => d.options?.length)).toEqual([3, 3]);
+  expect(new Set(got.flatMap((d) => d.options)).size).toBe(6);
+});
+
+test("매일 방식: 받은 안 중 하나를 골라야 완료할 수 있고, 완료 전에는 바꿀 수 있다", async () => {
+  const { event, members } = await setup("daily");
+  const at = kst("2026-12-01T10:00");
+  await advanceEvent(db, event.id, at);
+  const me = members[1].id;
+  const [delivery] = await mine(event.id, me);
+  const [first, second] = delivery.options!;
+
+  await expect(completeMission(db, me, delivery.id, at)).rejects.toMatchObject({ code: "NOT_CHOSEN" });
+  await expect(chooseMission(db, me, delivery.id, "목록에 없는 미션", at)).rejects.toMatchObject({ code: "NOT_AN_OPTION" });
+  await expect(chooseMission(db, members[2].id, delivery.id, first, at)).rejects.toMatchObject({ code: "NOT_YOURS" });
+
+  await chooseMission(db, me, delivery.id, first, at);
+  await chooseMission(db, me, delivery.id, second, at);
+  expect((await mine(event.id, me))[0].body).toBe(second);
+
+  await completeMission(db, me, delivery.id, at);
+  await expect(chooseMission(db, me, delivery.id, first, at)).rejects.toMatchObject({ code: "ALREADY_COMPLETED" });
+  const [done] = await mine(event.id, me);
+  expect(done.body).toBe(second);
+  expect(done.completedAt).toEqual(at);
+});
+
+test("이틀 방식과 직접 정하기는 고르지 않고 미션 하나가 그대로 온다", async () => {
+  const { event, members } = await setup("alternate");
+  await advanceEvent(db, event.id, kst("2026-12-01T10:00"));
+  const [delivery] = await mine(event.id, members[1].id);
+  expect(delivery.options).toBeNull();
+  expect(delivery.body).toEqual(expect.any(String));
+});
+
+test("매일 방식: 미션 목록이 하나뿐이면 고를 것 없이 그 미션이 온다", async () => {
+  const { event, organizer, members } = await setup("daily");
+  const templates = await listTemplates(db, event.id);
+  for (const t of templates.slice(1)) await deleteTemplate(db, organizer.id, t.id, now);
+  await advanceEvent(db, event.id, kst("2026-12-01T10:00"));
+  const [delivery] = await mine(event.id, members[1].id);
+  expect(delivery.options).toBeNull();
+  expect(delivery.body).toBe(templates[0].body);
 });
 
 test("이틀 방식과 직접 정하기", async () => {

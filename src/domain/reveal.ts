@@ -247,10 +247,11 @@ export async function getRevealData(db: Db, eventId: string, viewerId: string): 
 
   // 미션은 본문으로 묶는다(배달된 미션은 목록의 본문을 복사해 둔 것이다).
   const doneBy = new Map<string, string[]>();
-  for (const body of new Set([...templateRows.map((t) => t.body), ...missionRows.map((m) => m.body)])) {
+  // 완료한 배달에는 본문이 반드시 있다(고르지 않으면 완료할 수 없다).
+  for (const body of new Set([...templateRows.map((t) => t.body), ...missionRows.map((m) => m.body!)])) {
     doneBy.set(body, []);
   }
-  for (const m of missionRows) doneBy.get(m.body)!.push(nameOf.get(m.participantId) ?? "");
+  for (const m of missionRows) doneBy.get(m.body!)!.push(nameOf.get(m.participantId) ?? "");
   const missions = [...doneBy]
     .map(([body, names]) => ({ body, completedBy: names.filter(Boolean).sort((a, b) => a.localeCompare(b)) }))
     .sort((a, b) => b.completedBy.length - a.completedBy.length);
