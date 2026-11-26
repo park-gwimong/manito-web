@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -106,7 +107,10 @@ export const missionDeliveries = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
     participantId: uuid("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
+    /** 수행할 미션. 고르는 방식(`options`가 있는 배달)에서는 고르기 전까지 비어 있다. */
+    body: text("body"),
+    /** 고를 수 있는 미션 안. 없으면 본문이 처음부터 정해진 배달이다. */
+    options: jsonb("options").$type<string[]>(),
     slotIndex: integer("slot_index").notNull(),
     deliveredAt: tz("delivered_at").notNull(),
     completedAt: tz("completed_at"),

@@ -10,6 +10,8 @@ export type MissionMode = (typeof MISSION_MODES)[number];
 
 export const DEFAULT_MISSION_MODE: MissionMode = "daily";
 export const DEFAULT_MISSION_HOUR = 9;
+/** daily 방식에서 한 번에 보여 주는 미션 안의 수. 받은 사람이 이 중 하나를 고른다. */
+export const MISSION_CHOICES = 3;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;

@@ -6,7 +6,7 @@ import { parseKstInput } from "@/lib/format";
 import { Field } from "./ui";
 
 const MODES: { value: MissionMode; label: string; desc: string }[] = [
-  { value: "daily", label: "매일 1개", desc: "시작할 때 하나, 그 뒤로 매일 하나씩 도착해요." },
+  { value: "daily", label: "매일 1개", desc: "시작할 때 하나, 그 뒤로 매일 하나씩 도착해요. 올 때마다 3개 중 하나를 골라서 해요." },
   { value: "alternate", label: "이틀에 1개", desc: "시작할 때 하나, 그 뒤로 이틀에 하나씩 도착해요." },
   { value: "custom", label: "개수 직접 정하기", desc: "정한 개수를 기간에 고르게 나눠 보내요." },
 ];
